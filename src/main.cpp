@@ -6,6 +6,11 @@
 #include "PluginWindow.hpp"
 #include "Window.hpp"
 
+struct WGPUData {
+	WGPUDevice device = nullptr;
+	WGPUSurface surface = nullptr;
+};
+
 auto requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const * options)
 	-> WGPUAdapter
 {
@@ -189,6 +194,7 @@ void InspectDevice(WGPUDevice device) {
 
 void InitWebGPU(ES::Engine::Core &core)
 {
+	WGPUData data;
 	// We create a descriptor
 	WGPUInstanceDescriptor desc = {};
 	desc.nextInChain = nullptr;
@@ -196,28 +202,36 @@ void InitWebGPU(ES::Engine::Core &core)
 	// We create the instance using this descriptor
 	auto instance = wgpuCreateInstance(&desc);
 
-	// We can check whether there is actually an instance created
-	if (!instance) {
-		std::cerr << "Could not initialize WebGPU!" << std::endl;
-		throw std::runtime_error("Could not initialize WebGPU");
-	}
+	std::cout << "Creating surface..." << std::endl;
+	WGPUSurface surface = glfwCreateWindowWGPUSurface(instance, core.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow());
 
-	// Display the object (WGPUInstance is a simple pointer, it may be
-	// copied around without worrying about its size).
-	std::cout << "WGPU instance: " << instance << std::endl;
+	WGPUSurfaceConfiguration config = {};
+	config.nextInChain = nullptr;
+	config.width = 640;
+	config.height = 480;
+	WGPUTextureFormat surfaceFormat = WGPUTextureFormat_RGBA8Unorm; // Who to get a proper format?
+	config.format = surfaceFormat;
+	// And we do not need any particular view format:
+	config.viewFormatCount = 0;
+	config.viewFormats = nullptr;
+
+	wgpuSurfaceConfigure(surface, &config);
 
 	std::cout << "Requesting adapter..." << std::endl;
 	WGPURequestAdapterOptions adapterOpts = {};
 	adapterOpts.nextInChain = nullptr;
+	adapterOpts.compatibleSurface = surface;
 
 	WGPUAdapter adapter = requestAdapterSync(instance, &adapterOpts);
-	wgpuInstanceRelease(instance);
 
 	std::cout << "Got adapter: " << adapter << std::endl;
 
-	PrintLimits(adapter);
-	PrintFeatures(adapter);
-	PrintProperties(adapter);
+	// PrintLimits(adapter);
+	// PrintFeatures(adapter);
+	// PrintProperties(adapter);
+
+	WGPUSurfaceCapabilities capabilities = {};
+	capabilities.nextInChain = nullptr;
 
 	std::cout << "Requesting device..." << std::endl;
 
@@ -243,22 +257,16 @@ void InitWebGPU(ES::Engine::Core &core)
 	};
 
 	WGPUDevice device = requestDeviceSync(adapter, &deviceDesc);
-	// TODO: release device at the end
 
-	std::cout << "Got device: " << device << std::endl;
 	wgpuAdapterRelease(adapter);
 
-	InspectDevice(device);
+	std::cout << "Got device: " << device << std::endl;
+	// InspectDevice(device);
 
-	auto window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+	data.device = device;
+	data.surface = surface;
 
-	WGPUSurface surface = glfwCreateWindowWGPUSurface(instance, window.GetGLFWWindow());
-	// TODO: release surface at the end
-
-	if (!surface) {
-		std::cerr << "Could not create WebGPU surface!" << std::endl;
-		throw std::runtime_error("Could not create WebGPU surface");
-	}
+	core.RegisterResource<WGPUData>(std::move(data));
 }
 
 auto main(int ac, char **av) -> int
@@ -266,6 +274,23 @@ auto main(int ac, char **av) -> int
 	ES::Engine::Core core;
 
 	core.AddPlugins<ES::Plugin::Window::Plugin>();
+
+	core.RegisterSystem<ES::Engine::Scheduler::Startup>(
+		InitWebGPU
+	);
+
+	core.RegisterSystem<ES::Engine::Scheduler::Shutdown>(
+		[](ES::Engine::Core &core) {
+			auto data = core.GetResource<WGPUData>();
+			if (data.device) {
+				wgpuDeviceRelease(data.device);
+			}
+			if (data.surface) {
+				wgpuSurfaceUnconfigure(data.surface);
+				wgpuSurfaceRelease(data.surface);
+			}
+		}
+	);
 
 	core.RunCore();
 	// WGPUQueue queue = wgpuDeviceGetQueue(device);
