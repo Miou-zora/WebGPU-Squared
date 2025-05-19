@@ -34,3 +34,9 @@ xmake build -y
 xmake f -m debug
 xmake build -y
 ```
+
+### Running
+
+```sh
+xmake run
+```
