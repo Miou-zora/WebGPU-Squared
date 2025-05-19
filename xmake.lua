@@ -1,12 +1,13 @@
 add_rules("mode.debug", "mode.release")
-add_requires("glm >=1.0.1", "glfw >=3.4", "vcpkg::gl3w >=v2018-05-31#5")
+add_requires("wgpu-native ^24.0.0", {configs = {shared = true}})
 
-local project_name = "your_project_name"
+local project_name = "e2-wgpu"
+
+set_languages("c++20")
 
 target(project_name)
     set_kind("binary")
     set_default(true)
-    add_packages("glm", "glfw", "vcpkg::gl3w")
 
     add_files("src/**.cpp")
 
