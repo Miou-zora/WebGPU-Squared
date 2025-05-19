@@ -1,5 +1,5 @@
 # WebGPU-Squared
-[Engine Squared](https://github.com/EngineSquared/EngineSquared) plugin to use WebGPU
+[Engine Squared](https://github.com/EngineSquared/EngineSquared) project using WebGPU
 
 
 ## 📑 <samp>Requirements</samp>
