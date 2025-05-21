@@ -1,5 +1,5 @@
 # WebGPU-Squared
-[Engine Squared](https://github.com/EngineSquared/EngineSquared) plugin to use WebGPU
+[Engine Squared](https://github.com/EngineSquared/EngineSquared) project using WebGPU
 
 
 ## 📑 <samp>Requirements</samp>
@@ -33,4 +33,10 @@ xmake build -y
 ```sh
 xmake f -m debug
 xmake build -y
+```
+
+### Running
+
+```sh
+xmake run
 ```
