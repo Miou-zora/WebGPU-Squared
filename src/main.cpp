@@ -1,10 +1,11 @@
 #include <webgpu/webgpu.h>
-#include <glfw3webgpu.h>
+#include "glfw3webgpu.h"
 #include <iostream>
 #include <vector>
 #include "Engine.hpp"
 #include "PluginWindow.hpp"
 #include "Window.hpp"
+#include <GLFW/glfw3.h>
 
 struct WGPUData {
 	WGPUDevice device = nullptr;
@@ -203,19 +204,15 @@ void InitWebGPU(ES::Engine::Core &core)
 	auto instance = wgpuCreateInstance(&desc);
 
 	std::cout << "Creating surface..." << std::endl;
-	WGPUSurface surface = glfwCreateWindowWGPUSurface(instance, core.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow());
+	auto window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+	auto glfwWindow = window.GetGLFWWindow();
+	WGPUSurface surface = glfwCreateWindowWGPUSurface(instance, glfwWindow);
 
-	WGPUSurfaceConfiguration config = {};
-	config.nextInChain = nullptr;
-	config.width = 640;
-	config.height = 480;
-	WGPUTextureFormat surfaceFormat = WGPUTextureFormat_RGBA8Unorm; // Who to get a proper format?
-	config.format = surfaceFormat;
-	// And we do not need any particular view format:
-	config.viewFormatCount = 0;
-	config.viewFormats = nullptr;
-
-	wgpuSurfaceConfigure(surface, &config);
+	if (surface == nullptr) {
+		std::cerr << "Could not create surface" << std::endl;
+	} else {
+		std::cout << "Surface created: " << surface << std::endl;
+	}
 
 	std::cout << "Requesting adapter..." << std::endl;
 	WGPURequestAdapterOptions adapterOpts = {};
@@ -232,6 +229,8 @@ void InitWebGPU(ES::Engine::Core &core)
 
 	WGPUSurfaceCapabilities capabilities = {};
 	capabilities.nextInChain = nullptr;
+
+	wgpuSurfaceGetCapabilities(surface, adapter, &capabilities);
 
 	std::cout << "Requesting device..." << std::endl;
 
@@ -257,6 +256,23 @@ void InitWebGPU(ES::Engine::Core &core)
 	};
 
 	WGPUDevice device = requestDeviceSync(adapter, &deviceDesc);
+
+	WGPUSurfaceConfiguration config = {};
+	config.nextInChain = nullptr;
+	config.width = 640;
+	config.height = 480;
+	config.usage = WGPUTextureUsage_RenderAttachment;
+
+	WGPUTextureFormat surfaceFormat = capabilities.formats[0];
+	config.format = surfaceFormat;
+	config.viewFormatCount = 0;
+	config.viewFormats = nullptr;
+
+	config.device = device;
+	config.presentMode = WGPUPresentMode_Fifo;
+	config.alphaMode = WGPUCompositeAlphaMode_Auto;
+
+	wgpuSurfaceConfigure(surface, &config);
 
 	wgpuAdapterRelease(adapter);
 
