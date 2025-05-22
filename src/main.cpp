@@ -1,5 +1,5 @@
 #include <webgpu/webgpu.h>
-#include "glfw3webgpu.h"
+#include <glfw3webgpu.h>
 #include <iostream>
 #include <vector>
 #include "Engine.hpp"
@@ -10,7 +10,24 @@
 struct WGPUData {
 	WGPUDevice device = nullptr;
 	WGPUSurface surface = nullptr;
+	WGPUQueue queue = nullptr;
 };
+
+std::string_view toStdStringView(WGPUStringView wgpuStringView) {
+    return
+        wgpuStringView.data == nullptr
+        ? std::string_view()
+        : wgpuStringView.length == WGPU_STRLEN
+        ? std::string_view(wgpuStringView.data)
+        : std::string_view(wgpuStringView.data, wgpuStringView.length);
+}
+
+WGPUStringView toWgpuStringView(std::string_view stdStringView) {
+    return { stdStringView.data(), stdStringView.size() };
+}
+WGPUStringView toWgpuStringView(const char* cString) {
+    return { cString, WGPU_STRLEN };
+}
 
 auto requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const * options)
 	-> WGPUAdapter
@@ -42,9 +59,7 @@ auto requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const *
         if (status == WGPURequestAdapterStatus_Success) {
 			userData.adapter = adapter;
 		} else {
-			std::cout << "Could not get WebGPU adapter: ";
-			std::cout.write(message.data, message.length);
-			std::cout << std::endl;
+			std::cout << "Could not get WebGPU adapter: " << toStdStringView(message) << std::endl;
         }
         userData.requestEnded = true;
     };
@@ -59,8 +74,13 @@ auto requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const *
 		callbackInfo
 	);
 
-    if (!userData.requestEnded) {
-		throw std::runtime_error("Request adapter timed out");
+    while (!userData.requestEnded) {
+		// Hand the execution to the WebGPU instance so that it can check for
+		// pending async operations, in which case it invokes our callbacks.
+		wgpuInstanceProcessEvents(instance);
+
+		// Waiting for 200ms to avoid asking too often to process events
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
 	}
 
     return userData.adapter;
@@ -86,15 +106,18 @@ void PrintFeatures(const WGPUAdapter &adapter)
 {
 	// Call the function a first time with a null return address, just to get
 	// the entry count.
-	WGPUSupportedFeatures supportedFeatures = {};
-	wgpuAdapterGetFeatures(adapter, &supportedFeatures);
+	WGPUSupportedFeatures features = {};
+	wgpuAdapterGetFeatures(adapter, &features);
 
 	std::cout << "Adapter features:" << std::endl;
 	std::cout << std::hex; // Write integers as hexadecimal to ease comparison with webgpu.h literals
-	for (uint32_t i = 0; i < supportedFeatures.featureCount; ++i) {
-		std::cout << " - 0x" << supportedFeatures.features[i] << std::endl;
+	for (size_t i = 0; i < features.featureCount; ++i) {
+		std::cout << " - 0x" << features.features[i] << std::endl;
 	}
 	std::cout << std::dec; // Restore decimal numbers
+
+	// Free the memory that had potentially been allocated by wgpuAdapterGetFeatures()
+	wgpuSupportedFeaturesFreeMembers(features);
 }
 
 void PrintProperties(const WGPUAdapter &adapter)
@@ -105,23 +128,16 @@ void PrintProperties(const WGPUAdapter &adapter)
 
 	std::cout << "Adapter properties:" << std::endl;
 	std::cout << " - vendorID: " << properties.vendorID << std::endl;
-	if (properties.vendor.data) {
-		std::cout << " - vendorName: " << std::string_view(properties.vendor.data, properties.vendor.length) << std::endl;
-	}
-	if (properties.architecture.data) {
-		std::cout << " - architecture: " << std::string_view(properties.architecture.data, properties.architecture.length) << std::endl;
-	}
+	std::cout << " - vendorName: " << toStdStringView(properties.vendor) << std::endl;
+	std::cout << " - architecture: " << toStdStringView(properties.architecture) << std::endl;
 	std::cout << " - deviceID: " << properties.deviceID << std::endl;
-	if (properties.device.data) {
-		std::cout << " - name: " << std::string_view(properties.device.data, properties.device.length) << std::endl;
-	}
-	if (properties.description.data) {
-		std::cout << " - description: " << std::string_view(properties.description.data, properties.description.length) << std::endl;
-	}
+	std::cout << " - name: " << toStdStringView(properties.device) << std::endl;
+	std::cout << " - driverDescription: " << toStdStringView(properties.description) << std::endl;
 	std::cout << std::hex;
 	std::cout << " - adapterType: 0x" << properties.adapterType << std::endl;
 	std::cout << " - backendType: 0x" << properties.backendType << std::endl;
 	std::cout << std::dec; // Restore decimal numbers
+	wgpuAdapterInfoFreeMembers(properties);
 }
 
 /**
@@ -169,22 +185,22 @@ WGPUDevice requestDeviceSync(const WGPUAdapter &adapter, WGPUDeviceDescriptor co
 
 // We also add an inspect device function:
 void InspectDevice(WGPUDevice device) {
-    WGPUSupportedFeatures supportedFeatures = {};
-    wgpuDeviceGetFeatures(device, &supportedFeatures);
-
+    WGPUSupportedFeatures features = {};
+    wgpuDeviceGetFeatures(device, &features);
     std::cout << "Device features:" << std::endl;
     std::cout << std::hex;
-    for (uint32_t i = 0; i < supportedFeatures.featureCount; ++i) {
-        std::cout << " - 0x" << supportedFeatures.features[i] << std::endl;
+    for (size_t i = 0; i < features.featureCount; ++i) {
+        std::cout << " - 0x" << features.features[i] << std::endl;
     }
     std::cout << std::dec;
+    wgpuSupportedFeaturesFreeMembers(features);
 
     WGPULimits limits = {};
     limits.nextInChain = nullptr;
 
-    WGPUStatus success = wgpuDeviceGetLimits(device, &limits);
+    bool success = wgpuDeviceGetLimits(device, &limits) == WGPUStatus_Success;
 
-    if (success == WGPUStatus_Success) {
+    if (success) {
         std::cout << "Device limits:" << std::endl;
         std::cout << " - maxTextureDimension1D: " << limits.maxTextureDimension1D << std::endl;
         std::cout << " - maxTextureDimension2D: " << limits.maxTextureDimension2D << std::endl;
@@ -227,6 +243,8 @@ void InitWebGPU(ES::Engine::Core &core)
 	// PrintFeatures(adapter);
 	// PrintProperties(adapter);
 
+	wgpuInstanceRelease(instance);
+
 	WGPUSurfaceCapabilities capabilities = {};
 	capabilities.nextInChain = nullptr;
 
@@ -237,25 +255,33 @@ void InitWebGPU(ES::Engine::Core &core)
 	WGPUDeviceDescriptor deviceDesc = {};
 
 	deviceDesc.nextInChain = nullptr;
-	deviceDesc.label = WGPUStringView("My Device", 9); // anything works here, that's your call
+	deviceDesc.label = toWgpuStringView("My Device"); // anything works here, that's your call
 	deviceDesc.requiredFeatureCount = 0; // we do not require any specific feature
 	deviceDesc.requiredLimits = nullptr; // we do not require any specific limit (it will choose the minimal ones)
 	deviceDesc.defaultQueue.nextInChain = nullptr;
-	deviceDesc.defaultQueue.label = WGPUStringView("The default queue", 17);
+	deviceDesc.defaultQueue.label = toWgpuStringView("The default queue");
 	deviceDesc.deviceLostCallbackInfo = {};
+	deviceDesc.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents;
 	deviceDesc.deviceLostCallbackInfo.callback = [](WGPUDevice const * device, WGPUDeviceLostReason reason, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2) {
-		std::cout << "Device lost: reason " << reason;
-		if (message.data) std::cout << " (" << std::string_view(message.data, message.length) << ")";
-		std::cout << std::endl;
+		std::cout << "Device lost: reason " << reason << " (" << toStdStringView(message) << ")" << std::endl;
 	};
 	deviceDesc.uncapturedErrorCallbackInfo = {};
 	deviceDesc.uncapturedErrorCallbackInfo.callback = [](WGPUDevice const * device, WGPUErrorType type, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2) {
-		std::cout << "Uncaptured device error: type " << type;
-		if (message.data) std::cout << " (" << std::string_view(message.data, message.length) << ")";
-		std::cout << std::endl;
+		std::cout << "Uncaptured device error: type " << type << " (" << toStdStringView(message) << ")" << std::endl;
 	};
 
 	WGPUDevice device = requestDeviceSync(adapter, &deviceDesc);
+
+	data.queue = wgpuDeviceGetQueue(device);
+	auto onQueueWorkDone = [](WGPUQueueWorkDoneStatus status, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2) {
+		std::cout << "Queued work finished with status: " << status << std::endl;
+	};
+	WGPUQueueWorkDoneCallbackInfo callbackInfo = {};
+	callbackInfo.callback = onQueueWorkDone;
+	callbackInfo.userdata1 = nullptr;
+	callbackInfo.userdata2 = nullptr;
+	wgpuQueueOnSubmittedWorkDone(data.queue, callbackInfo);
+
 
 	WGPUSurfaceConfiguration config = {};
 	config.nextInChain = nullptr;
@@ -277,12 +303,97 @@ void InitWebGPU(ES::Engine::Core &core)
 	wgpuAdapterRelease(adapter);
 
 	std::cout << "Got device: " << device << std::endl;
-	// InspectDevice(device);
+	InspectDevice(device);
 
 	data.device = device;
 	data.surface = surface;
 
 	core.RegisterResource<WGPUData>(std::move(data));
+
+	WGPURenderPassDescriptor renderPassDesc = {};
+	renderPassDesc.nextInChain = nullptr;
+}
+
+WGPUTextureView GetNextSurfaceViewData(WGPUSurface &surface){
+	// Get the surface texture
+	WGPUSurfaceTexture surfaceTexture;
+	surfaceTexture.nextInChain = nullptr;
+	wgpuSurfaceGetCurrentTexture(surface, &surfaceTexture);
+	if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal) {
+		return nullptr;
+	}
+
+	// Create a view for this surface texture
+	WGPUTextureViewDescriptor viewDescriptor;
+	viewDescriptor.nextInChain = nullptr;
+	viewDescriptor.label = toWgpuStringView("Surface texture view");
+	viewDescriptor.format = wgpuTextureGetFormat(surfaceTexture.texture);
+	viewDescriptor.dimension = WGPUTextureViewDimension_2D;
+	viewDescriptor.baseMipLevel = 0;
+	viewDescriptor.mipLevelCount = 1;
+	viewDescriptor.baseArrayLayer = 0;
+	viewDescriptor.arrayLayerCount = 1;
+	viewDescriptor.aspect = WGPUTextureAspect_All;
+	WGPUTextureView targetView = wgpuTextureCreateView(surfaceTexture.texture, &viewDescriptor);
+
+	return targetView;
+}
+
+void DrawWebGPU(ES::Engine::Core &core)
+{
+	auto &data = core.GetResource<WGPUData>();
+	auto targetView = GetNextSurfaceViewData(data.surface);
+	if (!targetView) return;
+
+	// Create a command encoder for the draw call
+	WGPUCommandEncoderDescriptor encoderDesc = {};
+	encoderDesc.nextInChain = nullptr;
+	encoderDesc.label = toWgpuStringView("My command encoder");
+	WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(data.device, &encoderDesc);
+
+	wgpuCommandEncoderInsertDebugMarker(encoder, toWgpuStringView("Do something"));
+	wgpuCommandEncoderInsertDebugMarker(encoder, toWgpuStringView("Do something else"));
+
+	// Create the render pass that clears the screen with our color
+	WGPURenderPassDescriptor renderPassDesc = {};
+	renderPassDesc.nextInChain = nullptr;
+
+	// The attachment part of the render pass descriptor describes the target texture of the pass
+	WGPURenderPassColorAttachment renderPassColorAttachment = {};
+	renderPassColorAttachment.view = targetView;
+	renderPassColorAttachment.resolveTarget = nullptr;
+	renderPassColorAttachment.loadOp = WGPULoadOp_Clear;
+	renderPassColorAttachment.storeOp = WGPUStoreOp_Store;
+	renderPassColorAttachment.clearValue = WGPUColor{ 0.9, 0.1, 0.2, 1.0 };
+	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+	renderPassDesc.depthStencilAttachment = nullptr;
+	renderPassDesc.timestampWrites = nullptr;
+	renderPassDesc.label = toWgpuStringView("My render pass");
+
+	// Create the render pass and end it immediately (we only clear the screen but do not draw anything)
+	WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
+	wgpuRenderPassEncoderEnd(renderPass);
+	wgpuRenderPassEncoderRelease(renderPass);
+
+	// Finally encode and submit the render pass
+	WGPUCommandBufferDescriptor cmdBufferDescriptor = {};
+	cmdBufferDescriptor.nextInChain = nullptr;
+	cmdBufferDescriptor.label = toWgpuStringView("Command buffer");
+	WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &cmdBufferDescriptor);
+	wgpuCommandEncoderRelease(encoder);
+
+
+	// std::cout << "Submitting command..." << std::endl;
+	wgpuQueueSubmit(data.queue, 1, &command);
+	wgpuCommandBufferRelease(command);
+	// std::cout << "Command submitted." << std::endl;
+
+	// At the end of the frame
+	wgpuTextureViewRelease(targetView);
+	wgpuSurfacePresent(data.surface);
 }
 
 auto main(int ac, char **av) -> int
@@ -295,6 +406,10 @@ auto main(int ac, char **av) -> int
 		InitWebGPU
 	);
 
+	core.RegisterSystem<ES::Engine::Scheduler::Update>(
+		DrawWebGPU
+	);
+
 	core.RegisterSystem<ES::Engine::Scheduler::Shutdown>(
 		[](ES::Engine::Core &core) {
 			auto data = core.GetResource<WGPUData>();
@@ -305,43 +420,13 @@ auto main(int ac, char **av) -> int
 				wgpuSurfaceUnconfigure(data.surface);
 				wgpuSurfaceRelease(data.surface);
 			}
+			if (data.queue) {
+				wgpuQueueRelease(data.queue);
+			}
 		}
 	);
 
 	core.RunCore();
-	// WGPUQueue queue = wgpuDeviceGetQueue(device);
 
-	// auto onQueueWorkDone = [](WGPUQueueWorkDoneStatus status, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2) {
-	// 	std::cout << "Queued work finished with status: " << status << std::endl;
-	// };
-	// WGPUQueueWorkDoneCallbackInfo callbackInfo = {};
-	// callbackInfo.callback = onQueueWorkDone;
-	// callbackInfo.userdata1 = nullptr;
-	// callbackInfo.userdata2 = nullptr;
-	// wgpuQueueOnSubmittedWorkDone(queue, callbackInfo);
-
-	// WGPUCommandEncoderDescriptor encoderDesc = {};
-	// encoderDesc.nextInChain = nullptr;
-	// encoderDesc.label = WGPUStringView("My Encoder", 10);
-	// WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encoderDesc);
-
-	// wgpuCommandEncoderInsertDebugMarker(encoder, WGPUStringView("Do something", 12));
-	// wgpuCommandEncoderInsertDebugMarker(encoder, WGPUStringView("Do something else", 17));
-
-	// WGPUCommandBufferDescriptor cmdBufferDescriptor = {};
-	// cmdBufferDescriptor.nextInChain = nullptr;
-	// cmdBufferDescriptor.label = WGPUStringView("Command buffer", 14);
-	// WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &cmdBufferDescriptor);
-	// wgpuCommandEncoderRelease(encoder); // release encoder after it's finished
-
-	// // Finally submit the command queue
-	// std::cout << "Submitting command..." << std::endl;
-	// wgpuQueueSubmit(queue, 1, &command);
-	// wgpuCommandBufferRelease(command);
-	// std::cout << "Command submitted." << std::endl;
-
-	// wgpuQueueRelease(queue);
-
-	// wgpuDeviceRelease(device);
 	return 0;
 }
