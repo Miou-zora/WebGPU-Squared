@@ -1,4 +1,4 @@
-package("glfw3webgpuuuuuaa")
+package("glfw3webgpuq")
     set_description("An extension for the GLFW library for using WebGPU native.")
     set_homepage("https://github.com/eliemichel/glfw3webgpu")
     set_license("MIT")
@@ -22,24 +22,22 @@ package("glfw3webgpuuuuuaa")
             os.mv("glfw3webgpu.c", "glfw3webgpu.m")
         end
 
+        local configs = {}
         local glfw = package:dep("glfw")
         if glfw then
             if glfw:config("x11") then
-                package:add("defines", "_GLFW_X11")
+                configs.x11 = true
             end
             if glfw:config("wayland") then
-                package:add("defines", "_GLFW_WAYLAND")
+                configs.wayland = true
             end
-        end
-
-        if is_plat("macosx", "iphoneos") then
-            package:add("defines", "_GLFW_COCOA")
-        elseif is_plat("windows") then
-            package:add("defines", "_GLFW_WIN32")
         end
 
         io.writefile("xmake.lua", [[
             add_rules("mode.debug", "mode.release")
+
+            option("x11", {default = false})
+            option("wayland", {default = false})
 
             add_requires("wgpu-native", "glfw")
 
@@ -63,9 +61,22 @@ package("glfw3webgpuuuuuaa")
                 if is_plat("windows") and is_kind("shared") then
                     add_rules("utils.symbols.export_all")
                 end
+
+                if is_plat("windows") then
+                    add_defines("GLFW_EXPOSE_NATIVE_WIN32")
+                elseif is_plat("macosx", "iphoneos") then
+                    add_defines("GLFW_EXPOSE_NATIVE_COCOA")
+                end
+
+                if has_config("x11") then
+                    add_defines("GLFW_EXPOSE_NATIVE_X11")
+                elseif has_config("wayland") then
+                    add_defines("GLFW_EXPOSE_NATIVE_WAYLAND")
+                end
+
         ]])
 
-        import("package.tools.xmake").install(package)
+        import("package.tools.xmake").install(package, configs)
     end)
 
     on_test(function (package)
@@ -83,9 +94,9 @@ add_requires("wgpu-native ^24.0.0", {configs = {shared = true}})
 -- add_requires("glfw ^3.4", { configs = {shared = true} })
 -- add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = true} })
 add_requires("spdlog", "entt", "fmt", "glm")
-add_requires("glfw3webgpuuuuuaa v1.3.0-alpha", {configs = {shared = true} })
+add_requires("glfw3webgpuq v1.3.0-alpha", {configs = {shared = true} })
 
-includes("../EngineSquared/xmake.lua")
+includes("../../EngineSquared/xmake.lua")
 
 local project_name = "e2-wgpu"
 
@@ -98,7 +109,7 @@ target(project_name)
     add_packages("spdlog", "entt", "fmt", "glm")
 
     add_deps("EngineSquared")
-    add_packages("glfw3webgpuuuuuaa")
+    add_packages("glfw3webgpuq")
 
     add_files("src/**.cpp")
 
