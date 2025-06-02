@@ -16,16 +16,8 @@ struct WGPUData {
 
 const char* shaderSource = R"(
 @vertex
-fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4f {
-	var p = vec2f(0.0, 0.0);
-	if (in_vertex_index == 0u) {
-		p = vec2f(-0.5, -0.5);
-	} else if (in_vertex_index == 1u) {
-		p = vec2f(0.5, -0.5);
-	} else {
-		p = vec2f(0.0, 0.5);
-	}
-	return vec4f(p, 0.0, 1.0);
+fn vs_main(@location(0) in_vertex_position: vec2f) -> @builtin(position) vec4f {
+	return vec4f(in_vertex_position, 0.0, 1.0);
 }
 
 @fragment
@@ -230,6 +222,154 @@ void InspectDevice(WGPUDevice device) {
     }
 }
 
+uint32_t vertexCount = 0;
+WGPUBuffer vertexBuffer = nullptr;
+
+void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
+{
+	std::vector<float> vertexData = {
+		// Define a first triangle:
+		-0.45f, 0.5f,
+		0.45f, 0.5f,
+		0.0f, -0.5f,
+	
+		// Add a second triangle:
+		0.47f, 0.47f,
+		0.25f, 0.0f,
+		0.69f, 0.0f
+	};
+	
+	vertexCount = static_cast<uint32_t>(vertexData.size() / 2);
+	// Create vertex buffer
+	WGPUBufferDescriptor bufferDesc = {
+		NULL,
+		toWgpuStringView(NULL),
+		WGPUBufferUsage_None,
+		0,
+		false
+	};
+	bufferDesc.size = vertexData.size() * sizeof(float);
+	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex; // Vertex usage here!
+	vertexBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+	
+	// Upload geometry data to the buffer
+	wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertexData.data(), bufferDesc.size);
+}
+
+void InitializePipelineV2(WGPUDevice device, WGPUTextureFormat surfaceFormat, WGPURenderPipeline &pipeline)
+{
+	// In Initialize() or in a dedicated InitializePipeline()
+    WGPUShaderSourceWGSL wgslDesc = {
+		{
+			NULL,
+			WGPUSType_ShaderSourceWGSL
+		},
+		toWgpuStringView(NULL)
+	};
+    wgslDesc.code = toWgpuStringView(shaderSource);
+    WGPUShaderModuleDescriptor shaderDesc = {
+		NULL,
+		toWgpuStringView("My Shader Module")
+	};
+    shaderDesc.nextInChain = &wgslDesc.chain; // connect the chained extension
+    shaderDesc.label = toWgpuStringView("Shader source from Application.cpp");
+    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
+    WGPURenderPipelineDescriptor pipelineDesc = {
+		NULL,
+		toWgpuStringView("My Render Pipeline"),
+		NULL,
+		{
+			NULL,
+			NULL,
+			toWgpuStringView(NULL),
+			0,
+			NULL,
+			0,
+			NULL
+		},
+		{
+			NULL,
+			WGPUPrimitiveTopology_Undefined,
+			(WGPUIndexFormat)0,
+			WGPUFrontFace_Undefined,
+			WGPUCullMode_Undefined,
+			false
+		},
+		NULL,
+		{
+			NULL,
+			1,
+			0xFFFFFFFF,
+			false
+		},
+		NULL
+	};
+    WGPUVertexBufferLayout vertexBufferLayout = {
+		WGPUVertexStepMode_Undefined,
+		0,
+		0,
+		NULL
+	};
+    WGPUVertexAttribute positionAttrib = {
+		(WGPUVertexFormat)0,
+		0,
+		0
+	};
+    // == For each attribute, describe its layout, i.e., how to interpret the raw data ==
+    // Corresponds to @location(...)
+    positionAttrib.shaderLocation = 0;
+    // Means vec2f in the shader
+    positionAttrib.format = WGPUVertexFormat_Float32x2;
+    // Index of the first element
+    positionAttrib.offset = 0;
+    vertexBufferLayout.attributeCount = 1;
+    vertexBufferLayout.attributes = &positionAttrib;
+    // == Common to attributes from the same buffer ==
+    vertexBufferLayout.arrayStride = 2 * sizeof(float);
+    vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
+    // When describing the render pipeline:
+    pipelineDesc.vertex.bufferCount = 1;
+    pipelineDesc.vertex.buffers = &vertexBufferLayout;
+	pipelineDesc.vertex.module = shaderModule;
+    pipelineDesc.vertex.entryPoint = toWgpuStringView("vs_main");
+    WGPUFragmentState fragmentState = {
+		NULL,
+		NULL,
+		toWgpuStringView(NULL),
+		0,
+		NULL,
+		0,
+		NULL
+	};
+    fragmentState.module = shaderModule;
+    fragmentState.entryPoint = toWgpuStringView("fs_main");
+    WGPUColorTargetState colorTarget = {
+		NULL,
+		WGPUTextureFormat_Undefined,
+		NULL,
+		WGPUColorWriteMask_All
+	};
+    colorTarget.format = surfaceFormat;
+    WGPUBlendState blendState = {
+		{
+			WGPUBlendOperation_Undefined,
+			WGPUBlendFactor_Undefined,
+			WGPUBlendFactor_Undefined
+		},
+		{
+			WGPUBlendOperation_Undefined,
+			WGPUBlendFactor_Undefined,
+			WGPUBlendFactor_Undefined
+		}
+	};
+    colorTarget.blend = &blendState;
+    fragmentState.targetCount = 1;
+    fragmentState.targets = &colorTarget;
+    pipelineDesc.fragment = &fragmentState;
+    pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+    wgpuShaderModuleRelease(shaderModule);
+}
+
 void InitializePipeline(WGPUDevice device, WGPUTextureFormat &surfaceFormat, WGPURenderPipeline &pipeline) {
 	// Load the shader module
 	WGPUShaderModuleDescriptor shaderDesc{};
@@ -421,9 +561,11 @@ void InitWebGPU(ES::Engine::Core &core) {
 	data.device = device;
 	data.surface = surface;
 
-	
-	InitializePipeline(device, surfaceFormat, data.pipeline);
-	
+	// InitializePipeline(device, surfaceFormat, data.pipeline);
+	InitializePipelineV2(device, surfaceFormat, data.pipeline);
+
+	InitializeBuffers(device, data.queue);
+
 	core.RegisterResource<WGPUData>(std::move(data));
 }
 
@@ -491,8 +633,11 @@ void DrawWebGPU(ES::Engine::Core &core)
 
 		// Select which render pipeline to use
 	wgpuRenderPassEncoderSetPipeline(renderPass, data.pipeline);
+
+	wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, wgpuBufferGetSize(vertexBuffer));
+
 	// Draw 1 instance of a 3-vertices shape
-	wgpuRenderPassEncoderDraw(renderPass, 3, 1, 0, 0);
+	wgpuRenderPassEncoderDraw(renderPass, vertexCount, 1, 0, 0);
 
 	wgpuRenderPassEncoderEnd(renderPass);
 	wgpuRenderPassEncoderRelease(renderPass);
