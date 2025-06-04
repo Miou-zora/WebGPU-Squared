@@ -45,54 +45,37 @@ WGPUStringView toWgpuStringView(const char* cString) {
 auto requestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const * options)
 	-> WGPUAdapter
 {
-    // A simple structure holding the local information shared with the
-    // onAdapterRequestEnded callback.
     struct UserData {
         WGPUAdapter adapter = nullptr;
         bool requestEnded = false;
     };
     UserData userData;
 
-    // Callback called by wgpuInstanceRequestAdapter when the request returns
-    // This is a C++ lambda function, but could be any function defined in the
-    // global scope. It must be non-capturing (the brackets [] are empty) so
-    // that it behaves like a regular C function pointer, which is what
-    // wgpuInstanceRequestAdapter expects (WebGPU being a C API). The workaround
-    // is to convey what we want to capture through the pUserData pointer,
-    // provided as the last argument of wgpuInstanceRequestAdapter and received
-    // by the callback as its last argument.
     auto onAdapterRequestEnded = [](
-		WGPURequestAdapterStatus status, // a success status
-		WGPUAdapter adapter, // the returned adapter
-		WGPUStringView message, // error message, or nullptr
-		WGPU_NULLABLE void* userdata1, // custom user data, as provided when requesting the adapter
-		WGPU_NULLABLE void* userdata2 // custom user data, as provided when requesting the adapter
+		WGPURequestAdapterStatus status,
+		WGPUAdapter adapter,
+		WGPUStringView message,
+		WGPU_NULLABLE void* userdata1,
+		WGPU_NULLABLE void* userdata2
 	) {
         UserData& userData = *reinterpret_cast<UserData*>(userdata1);
+		userData.requestEnded = true;
         if (status == WGPURequestAdapterStatus_Success) {
 			userData.adapter = adapter;
 		} else {
-			std::cout << "Could not get WebGPU adapter: " << toStdStringView(message) << std::endl;
-        }
-        userData.requestEnded = true;
+			userData.adapter = {0};
+			ES::Utils::Log::Error(fmt::format("Could not get WebGPU adapter: {}", toStdStringView(message)));
+		}
     };
 
     WGPURequestAdapterCallbackInfo callbackInfo = {};
     callbackInfo.callback = onAdapterRequestEnded;
     callbackInfo.userdata1 = &userData;
 
-	wgpuInstanceRequestAdapter(
-		instance,
-		nullptr,
-		callbackInfo
-	);
+	wgpuInstanceRequestAdapter(instance, nullptr, callbackInfo);
 
     while (!userData.requestEnded) {
-		// Hand the execution to the WebGPU instance so that it can check for
-		// pending async operations, in which case it invokes our callbacks.
 		wgpuInstanceProcessEvents(instance);
-
-		// Waiting for 200ms to avoid asking too often to process events
 		std::this_thread::sleep_for(std::chrono::milliseconds(200));
 	}
 
@@ -107,29 +90,23 @@ void PrintLimits(const WGPUAdapter &adapter)
 	WGPUStatus success = wgpuAdapterGetLimits(adapter, &supportedLimits);
 
 	if (success == WGPUStatus_Success) {
-		std::cout << "Adapter limits:" << std::endl;
-		std::cout << " - maxTextureDimension1D: " << supportedLimits.maxTextureDimension1D << std::endl;
-		std::cout << " - maxTextureDimension2D: " << supportedLimits.maxTextureDimension2D << std::endl;
-		std::cout << " - maxTextureDimension3D: " << supportedLimits.maxTextureDimension3D << std::endl;
-		std::cout << " - maxTextureArrayLayers: " << supportedLimits.maxTextureArrayLayers << std::endl;
+		ES::Utils::Log::Info("Adapter limits:");
+		ES::Utils::Log::Info(fmt::format(" - maxTextureDimension1D: {}", supportedLimits.maxTextureDimension1D));
+		ES::Utils::Log::Info(fmt::format(" - maxTextureDimension2D: {}", supportedLimits.maxTextureDimension2D));
+		ES::Utils::Log::Info(fmt::format(" - maxTextureDimension3D: {}", supportedLimits.maxTextureDimension3D));
+		ES::Utils::Log::Info(fmt::format(" - maxTextureArrayLayers: {}", supportedLimits.maxTextureArrayLayers));
 	}
 }
 
 void PrintFeatures(const WGPUAdapter &adapter)
 {
-	// Call the function a first time with a null return address, just to get
-	// the entry count.
 	WGPUSupportedFeatures features = {};
 	wgpuAdapterGetFeatures(adapter, &features);
 
-	std::cout << "Adapter features:" << std::endl;
-	std::cout << std::hex; // Write integers as hexadecimal to ease comparison with webgpu.h literals
+	ES::Utils::Log::Info("Adapter features:");
 	for (size_t i = 0; i < features.featureCount; ++i) {
-		std::cout << " - 0x" << features.features[i] << std::endl;
+		ES::Utils::Log::Info(fmt::format(" - 0x{:x}", static_cast<uint32_t>(features.features[i])));
 	}
-	std::cout << std::dec; // Restore decimal numbers
-
-	// Free the memory that had potentially been allocated by wgpuAdapterGetFeatures()
 	wgpuSupportedFeaturesFreeMembers(features);
 }
 
@@ -139,27 +116,18 @@ void PrintProperties(const WGPUAdapter &adapter)
 	properties.nextInChain = nullptr;
 	wgpuAdapterGetInfo(adapter, &properties);
 
-	std::cout << "Adapter properties:" << std::endl;
-	std::cout << " - vendorID: " << properties.vendorID << std::endl;
-	std::cout << " - vendorName: " << toStdStringView(properties.vendor) << std::endl;
-	std::cout << " - architecture: " << toStdStringView(properties.architecture) << std::endl;
-	std::cout << " - deviceID: " << properties.deviceID << std::endl;
-	std::cout << " - name: " << toStdStringView(properties.device) << std::endl;
-	std::cout << " - driverDescription: " << toStdStringView(properties.description) << std::endl;
-	std::cout << std::hex;
-	std::cout << " - adapterType: 0x" << properties.adapterType << std::endl;
-	std::cout << " - backendType: 0x" << properties.backendType << std::endl;
-	std::cout << std::dec; // Restore decimal numbers
+	ES::Utils::Log::Info("Adapter properties:");
+	ES::Utils::Log::Info(fmt::format(" - vendorID: {}", properties.vendorID));
+	ES::Utils::Log::Info(fmt::format(" - vendorName: {}", toStdStringView(properties.vendor)));
+	ES::Utils::Log::Info(fmt::format(" - architecture: {}", toStdStringView(properties.architecture)));
+	ES::Utils::Log::Info(fmt::format(" - deviceID: {}", properties.deviceID));
+	ES::Utils::Log::Info(fmt::format(" - name: {}", toStdStringView(properties.device)));
+	ES::Utils::Log::Info(fmt::format(" - driverDescription: {}", toStdStringView(properties.description)));
+	ES::Utils::Log::Info(fmt::format(" - adapterType: 0x{:x}", static_cast<uint32_t>(properties.adapterType)));
+	ES::Utils::Log::Info(fmt::format(" - backendType: 0x{:x}", static_cast<uint32_t>(properties.backendType)));
 	wgpuAdapterInfoFreeMembers(properties);
 }
 
-/**
- * Utility function to get a WebGPU device, so that
- *     WGPUDevice device = requestDeviceSync(adapter, options);
- * is roughly equivalent to
- *     const device = await adapter.requestDevice(descriptor);
- * It is very similar to requestAdapter
- */
 WGPUDevice requestDeviceSync(const WGPUAdapter &adapter, WGPUDeviceDescriptor const * descriptor) {
     struct UserData {
         WGPUDevice device = nullptr;
@@ -173,8 +141,9 @@ WGPUDevice requestDeviceSync(const WGPUAdapter &adapter, WGPUDeviceDescriptor co
         if (status == WGPURequestDeviceStatus_Success) {
             userData.device = device;
         } else {
-            std::cout << "Could not get WebGPU device: " << std::string_view(message.data, message.length) << std::endl;
-        }
+			userData.device = nullptr;
+			ES::Utils::Log::Error(fmt::format("Could not get WebGPU device: {}", toStdStringView(message)));
+		}
         userData.requestEnded = true;
     };
 
@@ -189,23 +158,21 @@ WGPUDevice requestDeviceSync(const WGPUAdapter &adapter, WGPUDeviceDescriptor co
     );
 
 	if (!userData.requestEnded) {
-		std::cerr << "Request device timed out" << std::endl;
+		ES::Utils::Log::Error("Request device timed out");
 		throw std::runtime_error("Request device timed out");
 	}
 
     return userData.device;
 }
 
-// We also add an inspect device function:
 void InspectDevice(WGPUDevice device) {
     WGPUSupportedFeatures features = {};
     wgpuDeviceGetFeatures(device, &features);
-    std::cout << "Device features:" << std::endl;
-    std::cout << std::hex;
+
+    ES::Utils::Log::Info("Device features:");
     for (size_t i = 0; i < features.featureCount; ++i) {
-        std::cout << " - 0x" << features.features[i] << std::endl;
+        ES::Utils::Log::Info(fmt::format(" - 0x{:x}", static_cast<uint32_t>(features.features[i])));
     }
-    std::cout << std::dec;
     wgpuSupportedFeaturesFreeMembers(features);
 
     WGPULimits limits = {};
@@ -213,13 +180,16 @@ void InspectDevice(WGPUDevice device) {
 
     bool success = wgpuDeviceGetLimits(device, &limits) == WGPUStatus_Success;
 
-    if (success) {
-        std::cout << "Device limits:" << std::endl;
-        std::cout << " - maxTextureDimension1D: " << limits.maxTextureDimension1D << std::endl;
-        std::cout << " - maxTextureDimension2D: " << limits.maxTextureDimension2D << std::endl;
-        std::cout << " - maxTextureDimension3D: " << limits.maxTextureDimension3D << std::endl;
-        std::cout << " - maxTextureArrayLayers: " << limits.maxTextureArrayLayers << std::endl;
-    }
+	if (!success) {
+		ES::Utils::Log::Error("Failed to get device limits");
+		throw std::runtime_error("Failed to get device limits");
+	}
+
+	ES::Utils::Log::Info("Device limits:");
+	ES::Utils::Log::Info(fmt::format(" - maxTextureDimension1D: {}", limits.maxTextureDimension1D));
+	ES::Utils::Log::Info(fmt::format(" - maxTextureDimension2D: {}", limits.maxTextureDimension2D));
+	ES::Utils::Log::Info(fmt::format(" - maxTextureDimension3D: {}", limits.maxTextureDimension3D));
+	ES::Utils::Log::Info(fmt::format(" - maxTextureArrayLayers: {}", limits.maxTextureArrayLayers));
 }
 
 uint32_t vertexCount = 0;
@@ -370,138 +340,54 @@ void InitializePipelineV2(WGPUDevice device, WGPUTextureFormat surfaceFormat, WG
     wgpuShaderModuleRelease(shaderModule);
 }
 
-void InitializePipeline(WGPUDevice device, WGPUTextureFormat &surfaceFormat, WGPURenderPipeline &pipeline) {
-	// Load the shader module
-	WGPUShaderModuleDescriptor shaderDesc{};
-
-    WGPUShaderSourceWGSL wgsl_desc = {};
-    wgsl_desc.chain.sType = WGPUSType_ShaderSourceWGSL;
-    wgsl_desc.code = toWgpuStringView(shaderSource);
-
-	shaderDesc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgsl_desc);
-	shaderDesc.label = toWgpuStringView("My shader module");
-	WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
-
-	// Create the render pipeline
-	WGPURenderPipelineDescriptor pipelineDesc{};
-	pipelineDesc.nextInChain = nullptr;
-
-	// We do not use any vertex buffer for this first simplistic example
-	pipelineDesc.vertex.bufferCount = 0;
-	pipelineDesc.vertex.buffers = nullptr;
-
-	// NB: We define the 'shaderModule' in the second part of this chapter.
-	// Here we tell that the programmable vertex shader stage is described
-	// by the function called 'vs_main' in that module.
-	pipelineDesc.vertex.module = shaderModule;
-	pipelineDesc.vertex.entryPoint = toWgpuStringView("vs_main");
-	pipelineDesc.vertex.constantCount = 0;
-	pipelineDesc.vertex.constants = nullptr;
-
-	// Each sequence of 3 vertices is considered as a triangle
-	pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-	
-	// We'll see later how to specify the order in which vertices should be
-	// connected. When not specified, vertices are considered sequentially.
-	pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
-	
-	// The face orientation is defined by assuming that when looking
-	// from the front of the face, its corner vertices are enumerated
-	// in the counter-clockwise (CCW) order.
-	pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
-	
-	// But the face orientation does not matter much because we do not
-	// cull (i.e. "hide") the faces pointing away from us (which is often
-	// used for optimization).
-	pipelineDesc.primitive.cullMode = WGPUCullMode_None;
-
-	// We tell that the programmable fragment shader stage is described
-	// by the function called 'fs_main' in the shader module.
-	WGPUFragmentState fragmentState{};
-	fragmentState.module = shaderModule;
-	fragmentState.entryPoint = toWgpuStringView("fs_main");
-	fragmentState.constantCount = 0;
-	fragmentState.constants = nullptr;
-
-	WGPUBlendState blendState{};
-	blendState.color.srcFactor = WGPUBlendFactor_SrcAlpha;
-	blendState.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
-	blendState.color.operation = WGPUBlendOperation_Add;
-	blendState.alpha.srcFactor = WGPUBlendFactor_Zero;
-	blendState.alpha.dstFactor = WGPUBlendFactor_One;
-	blendState.alpha.operation = WGPUBlendOperation_Add;
-	
-	WGPUColorTargetState colorTarget{};
-	colorTarget.format = surfaceFormat;
-	colorTarget.blend = &blendState;
-	colorTarget.writeMask = WGPUColorWriteMask_All; // We could write to only some of the color channels.
-	
-	// We have only one target because our render pass has only one output color
-	// attachment.
-	fragmentState.targetCount = 1;
-	fragmentState.targets = &colorTarget;
-	pipelineDesc.fragment = &fragmentState;
-
-	// We do not use stencil/depth testing for now
-	pipelineDesc.depthStencil = nullptr;
-
-	// Samples per pixel
-	pipelineDesc.multisample.count = 1;
-
-	// Default value for the mask, meaning "all bits on"
-	pipelineDesc.multisample.mask = ~0u;
-
-	// Default value as well (irrelevant for count = 1 anyways)
-	pipelineDesc.multisample.alphaToCoverageEnabled = false;
-
-	pipelineDesc.layout = nullptr;
-
-	pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
-
-	// We no longer need to access the shader module
-	wgpuShaderModuleRelease(shaderModule);
-}
-
-
-void InitWebGPU(ES::Engine::Core &core) {
-	WGPUData data;
-	// We create a descriptor
-	WGPUInstanceDescriptor desc = {};
-	desc.nextInChain = nullptr;
-
-	// We create the instance using this descriptor
-	auto instance = wgpuCreateInstance(&desc);
-
-	std::cout << "Creating surface..." << std::endl;
+void CreateSurface(ES::Engine::Core &core) {
+	WGPUData &data = core.GetResource<WGPUData>();
+	auto &instance = core.GetResource<WGPUInstance>();
+	ES::Utils::Log::Info("Creating surface...");
 	auto window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 	auto glfwWindow = window.GetGLFWWindow();
-	WGPUSurface surface = glfwCreateWindowWGPUSurface(instance, glfwWindow);
+	data.surface = glfwCreateWindowWGPUSurface(instance, glfwWindow);
 
-	if (surface == nullptr) {
-		std::cerr << "Could not create surface" << std::endl;
+	if (data.surface == nullptr) {
+		ES::Utils::Log::Error("Could not create surface");
 	} else {
-		std::cout << "Surface created: " << surface << std::endl;
+		ES::Utils::Log::Info(fmt::format("Surface created: {}", static_cast<void*>(data.surface)));
 	}
+}
 
-	std::cout << "Requesting adapter..." << std::endl;
+void CreateInstance(ES::Engine::Core &core) {
+	WGPUInstanceDescriptor desc = {};
+	desc.nextInChain = nullptr;
+	core.RegisterResource<WGPUInstance>(wgpuCreateInstance(&desc));
+}
+
+void InitWebGPU(ES::Engine::Core &core) {
+	WGPUData &data = core.RegisterResource(WGPUData{});
+
+	CreateInstance(core);
+	WGPUInstance &instance = core.GetResource<WGPUInstance>();
+
+	CreateSurface(core);
+
+	ES::Utils::Log::Info("Requesting adapter...");
 	WGPURequestAdapterOptions adapterOpts = {};
 	adapterOpts.nextInChain = nullptr;
-	adapterOpts.compatibleSurface = surface;
+	adapterOpts.compatibleSurface = data.surface;
 
 	WGPUAdapter adapter = requestAdapterSync(instance, &adapterOpts);
 
-	std::cout << "Got adapter: " << adapter << std::endl;
+	ES::Utils::Log::Info(fmt::format("Got adapter: {}", static_cast<void*>(adapter)));
 
-	// PrintLimits(adapter);
-	// PrintFeatures(adapter);
-	// PrintProperties(adapter);
+	PrintLimits(adapter);
+	PrintFeatures(adapter);
+	PrintProperties(adapter);
 
 	wgpuInstanceRelease(instance);
 
 	WGPUSurfaceCapabilities capabilities = {};
 	capabilities.nextInChain = nullptr;
 
-	wgpuSurfaceGetCapabilities(surface, adapter, &capabilities);
+	wgpuSurfaceGetCapabilities(data.surface, adapter, &capabilities);
 
 	std::cout << "Requesting device..." << std::endl;
 
@@ -551,7 +437,7 @@ void InitWebGPU(ES::Engine::Core &core) {
 	config.presentMode = WGPUPresentMode_Fifo;
 	config.alphaMode = WGPUCompositeAlphaMode_Auto;
 
-	wgpuSurfaceConfigure(surface, &config);
+	wgpuSurfaceConfigure(data.surface, &config);
 
 	wgpuAdapterRelease(adapter);
 
@@ -559,14 +445,12 @@ void InitWebGPU(ES::Engine::Core &core) {
 	InspectDevice(device);
 
 	data.device = device;
-	data.surface = surface;
 
 	// InitializePipeline(device, surfaceFormat, data.pipeline);
 	InitializePipelineV2(device, surfaceFormat, data.pipeline);
 
 	InitializeBuffers(device, data.queue);
 
-	core.RegisterResource<WGPUData>(std::move(data));
 }
 
 WGPUTextureView GetNextSurfaceViewData(WGPUSurface &surface){
@@ -660,6 +544,47 @@ void DrawWebGPU(ES::Engine::Core &core)
 	wgpuSurfacePresent(data.surface);
 }
 
+void ReleaseDevice(ES::Engine::Core &core)
+{
+	auto data = core.GetResource<WGPUData>();
+
+	if (data.device) {
+		wgpuDeviceRelease(data.device);
+		data.device = nullptr;
+	}
+}
+
+void ReleaseSurface(ES::Engine::Core &core)
+{
+	auto data = core.GetResource<WGPUData>();
+
+	if (data.surface) {
+		wgpuSurfaceUnconfigure(data.surface);
+		wgpuSurfaceRelease(data.surface);
+		data.surface = nullptr;
+	}
+}
+
+void ReleaseQueue(ES::Engine::Core &core)
+{
+	auto data = core.GetResource<WGPUData>();
+
+	if (data.queue) {
+		wgpuQueueRelease(data.queue);
+		data.queue = nullptr;
+	}
+}
+
+void ReleasePipeline(ES::Engine::Core &core)
+{
+	auto data = core.GetResource<WGPUData>();
+
+	if (data.pipeline) {
+		wgpuRenderPipelineRelease(data.pipeline);
+		data.pipeline = nullptr;
+	}
+}
+
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
@@ -675,19 +600,10 @@ auto main(int ac, char **av) -> int
 	);
 
 	core.RegisterSystem<ES::Engine::Scheduler::Shutdown>(
-		[](ES::Engine::Core &core) {
-			auto data = core.GetResource<WGPUData>();
-			if (data.device) {
-				wgpuDeviceRelease(data.device);
-			}
-			if (data.surface) {
-				wgpuSurfaceUnconfigure(data.surface);
-				wgpuSurfaceRelease(data.surface);
-			}
-			if (data.queue) {
-				wgpuQueueRelease(data.queue);
-			}
-		}
+		ReleaseDevice,
+		ReleaseSurface,
+		ReleaseQueue,
+		ReleasePipeline
 	);
 
 	core.RunCore();
