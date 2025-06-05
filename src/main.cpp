@@ -8,14 +8,27 @@
 #include <GLFW/glfw3.h>
 
 const char* shaderSource = R"(
+struct VertexInput {
+    @location(0) position: vec2f,
+    @location(1) color: vec3f,
+};
+
+struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) color: vec3f,
+};
+
 @vertex
-fn vs_main(@location(0) in_vertex_position: vec2f) -> @builtin(position) vec4f {
-	return vec4f(in_vertex_position, 0.0, 1.0);
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.position = vec4f(in.position, 0.0, 1.0);
+    out.color = in.color;
+    return out;
 }
 
 @fragment
-fn fs_main() -> @location(0) vec4f {
-	return vec4f(0.0, 0.4, 1.0, 1.0);
+fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    return vec4f(in.color, 1.0);
 }
 )";
 
@@ -202,23 +215,48 @@ void InspectDevice(ES::Engine::Core &core) {
 }
 
 uint32_t vertexCount = 0;
-WGPUBuffer vertexBuffer = nullptr;
+// TODO: Release them
+WGPUBuffer positionBuffer = nullptr;
+WGPUBuffer colorBuffer = nullptr;
 
 void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 {
-	std::vector<float> vertexData = {
-		// Define a first triangle:
-		-0.45f, 0.5f,
-		0.45f, 0.5f,
+	std::vector<WGPUVertexBufferLayout> vertexBufferLayouts(2);
+
+	// We now have 2 attributes
+	std::vector<WGPUVertexAttribute> vertexAttribs(2);
+
+	// [...] Describe the position attribute
+	vertexAttribs[0].shaderLocation = 0;
+	vertexAttribs[0].format = WGPUVertexFormat_Float32x2;
+	vertexAttribs[0].offset = 0;
+
+	// [...] Describe the color attribute
+	vertexAttribs[1].shaderLocation = 1;
+	vertexAttribs[1].format = WGPUVertexFormat_Float32x3;
+	vertexAttribs[1].offset = 2 * sizeof(float);
+
+	std::vector<float> positionData = {
+		-0.45f,  0.5f,
+		0.45f,  0.5f,
 		0.0f, -0.5f,
-	
-		// Add a second triangle:
 		0.47f, 0.47f,
-		0.25f, 0.0f,
-		0.69f, 0.0f
+		0.25f,  0.0f,
+		0.69f,  0.0f
 	};
-	
-	vertexCount = static_cast<uint32_t>(vertexData.size() / 2);
+
+	// r0,  g0,  b0, r1,  g1,  b1, ...
+	std::vector<float> colorData = {
+		1.0, 1.0, 0.0, // (yellow)
+		1.0, 0.0, 1.0, // (magenta)
+		0.0, 1.0, 1.0, // (cyan)
+		1.0, 0.0, 0.0, // (red)
+		0.0, 1.0, 0.0, // (green)
+		0.0, 0.0, 1.0  // (blue)
+	};
+
+	vertexCount = static_cast<uint32_t>(positionData.size() / 2);
+	if (vertexCount != static_cast<uint32_t>(colorData.size() / 3)) throw std::runtime_error("Vertex count does not match color count");
 	// Create vertex buffer
 	WGPUBufferDescriptor bufferDesc = {
 		NULL,
@@ -227,12 +265,19 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 		0,
 		false
 	};
-	bufferDesc.size = vertexData.size() * sizeof(float);
-	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex; // Vertex usage here!
-	vertexBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
-	
-	// Upload geometry data to the buffer
-	wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertexData.data(), bufferDesc.size);
+	bufferDesc.nextInChain = nullptr;
+	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+	bufferDesc.mappedAtCreation = false;
+
+	bufferDesc.label = toWgpuStringView("Vertex Position");
+	bufferDesc.size = positionData.size() * sizeof(float);
+	positionBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+	wgpuQueueWriteBuffer(queue, positionBuffer, 0, positionData.data(), bufferDesc.size);
+
+	bufferDesc.label = toWgpuStringView("Vertex Color");
+	bufferDesc.size = colorData.size() * sizeof(float);
+	colorBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+	wgpuQueueWriteBuffer(queue, colorBuffer, 0, colorData.data(), bufferDesc.size);
 }
 
 void InitializePipelineV2(ES::Engine::Core &core)
@@ -291,26 +336,32 @@ void InitializePipelineV2(ES::Engine::Core &core)
 		0,
 		NULL
 	};
-    WGPUVertexAttribute positionAttrib = {
-		(WGPUVertexFormat)0,
-		0,
-		0
-	};
-    // == For each attribute, describe its layout, i.e., how to interpret the raw data ==
-    // Corresponds to @location(...)
-    positionAttrib.shaderLocation = 0;
-    // Means vec2f in the shader
-    positionAttrib.format = WGPUVertexFormat_Float32x2;
-    // Index of the first element
-    positionAttrib.offset = 0;
-    vertexBufferLayout.attributeCount = 1;
-    vertexBufferLayout.attributes = &positionAttrib;
-    // == Common to attributes from the same buffer ==
-    vertexBufferLayout.arrayStride = 2 * sizeof(float);
-    vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
+
+	std::vector<WGPUVertexBufferLayout> vertexBufferLayouts(2);
+
+    WGPUVertexAttribute positionAttrib;
+	positionAttrib.shaderLocation = 0; // @location(0)
+	positionAttrib.format = WGPUVertexFormat_Float32x2; // size of position
+	positionAttrib.offset = 0;
+
+	vertexBufferLayouts[0].attributeCount = 1;
+	vertexBufferLayouts[0].attributes = &positionAttrib;
+	vertexBufferLayouts[0].arrayStride = 2 * sizeof(float); // stride = size of position
+	vertexBufferLayouts[0].stepMode = WGPUVertexStepMode_Vertex;
+
+	WGPUVertexAttribute colorAttrib;
+	colorAttrib.shaderLocation = 1; // @location(1)
+	colorAttrib.format = WGPUVertexFormat_Float32x3; // size of color
+	colorAttrib.offset = 0;
+
+	vertexBufferLayouts[1].attributeCount = 1;
+	vertexBufferLayouts[1].attributes = &colorAttrib;
+	vertexBufferLayouts[1].arrayStride = 3 * sizeof(float); // stride = size of color
+	vertexBufferLayouts[1].stepMode = WGPUVertexStepMode_Vertex;
+
     // When describing the render pipeline:
-    pipelineDesc.vertex.bufferCount = 1;
-    pipelineDesc.vertex.buffers = &vertexBufferLayout;
+    pipelineDesc.vertex.bufferCount = static_cast<uint32_t>(vertexBufferLayouts.size());
+    pipelineDesc.vertex.buffers = vertexBufferLayouts.data();
 	pipelineDesc.vertex.module = shaderModule;
     pipelineDesc.vertex.entryPoint = toWgpuStringView("vs_main");
     WGPUFragmentState fragmentState = {
@@ -600,7 +651,7 @@ void DrawWebGPU(ES::Engine::Core &core)
 	renderPassColorAttachment.resolveTarget = nullptr;
 	renderPassColorAttachment.loadOp = WGPULoadOp_Clear;
 	renderPassColorAttachment.storeOp = WGPUStoreOp_Store;
-	renderPassColorAttachment.clearValue = WGPUColor{ 0.9, 0.1, 0.2, 1.0 };
+	renderPassColorAttachment.clearValue = WGPUColor{ .05, 0.05, 0.05, 1.0 };
 	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 
 	renderPassDesc.colorAttachmentCount = 1;
@@ -615,7 +666,8 @@ void DrawWebGPU(ES::Engine::Core &core)
 		// Select which render pipeline to use
 	wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
 
-	wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, wgpuBufferGetSize(vertexBuffer));
+	wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, positionBuffer, 0, wgpuBufferGetSize(positionBuffer));
+	wgpuRenderPassEncoderSetVertexBuffer(renderPass, 1, colorBuffer, 0, wgpuBufferGetSize(colorBuffer));
 
 	// Draw 1 instance of a 3-vertices shape
 	wgpuRenderPassEncoderDraw(renderPass, vertexCount, 1, 0, 0);
