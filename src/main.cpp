@@ -20,15 +20,20 @@ struct VertexOutput {
     @location(0) color: vec3f,
 };
 
+struct MyUniforms {
+    color: vec4f,
+    time: f32,
+};
+
 @group(0) @binding(0)
-var<uniform> uTime: f32;
+var<uniform> uMyUniform: MyUniforms;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 	let ratio = 800.0 / 800.0; // The width and height of the target surface
 	var offset = vec2f(-0.6875, -0.463);
-	offset += 0.3 * vec2f(cos(uTime), sin(uTime));
+	offset += 0.3 * vec2f(cos(uMyUniform.time), sin(uMyUniform.time));
 	out.position = vec4f(in.position.x + offset.x, (in.position.y + offset.y) * ratio, 0.0, 1.0);
     out.color = in.color;
     return out;
@@ -36,9 +41,17 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return vec4f(in.color, 1.0);
+    return vec4f(in.color, 1.0) * uMyUniform.color;
 }
 )";
+
+struct MyUniforms {
+    std::array<float, 4> color;
+    float time;
+	float _pad[3];
+};
+
+static_assert(sizeof(MyUniforms) % 16 == 0);
 
 std::string_view toStdStringView(WGPUStringView wgpuStringView) {
     return
@@ -297,10 +310,15 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 
 	wgpuQueueWriteBuffer(queue, indexBuffer, 0, indexData.data(), bufferDesc.size);
 
-	bufferDesc.size = 4 * sizeof(float);
+	bufferDesc.size = sizeof(MyUniforms);
 	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
-
 	uniformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+
+	// Upload the initial value of the uniforms
+	MyUniforms uniforms;
+	uniforms.time = 1.0f;
+	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniforms, sizeof(uniforms));
 }
 
 void InitializePipelineV2(ES::Engine::Core &core)
@@ -381,9 +399,9 @@ void InitializePipelineV2(ES::Engine::Core &core)
 	// Define binding layout
 	WGPUBindGroupLayoutEntry bindingLayout = {0};
 	bindingLayout.binding = 0;
-	bindingLayout.visibility = WGPUShaderStage_Vertex;
+	bindingLayout.visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
 	bindingLayout.buffer.type = WGPUBufferBindingType_Uniform;
-	bindingLayout.buffer.minBindingSize = 4 * sizeof(float);
+	bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
 
 	// Create a bind group layout
 	WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {0};
@@ -639,7 +657,7 @@ void InitWebGPU(ES::Engine::Core &core) {
 	binding.binding = 0;
 	binding.buffer = uniformBuffer;
 	binding.offset = 0;
-	binding.size = 4 * sizeof(float);
+	binding.size = sizeof(MyUniforms);
 
 	// A bind group contains one or multiple bindings
 	WGPUBindGroupDescriptor bindGroupDesc = {0};
@@ -687,8 +705,12 @@ void DrawWebGPU(ES::Engine::Core &core)
 	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw.");
 	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw.");
 
-	float t = static_cast<float>(glfwGetTime()); // glfwGetTime returns a double
-	wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &t, sizeof(float));
+	// Update uniform buffer
+	MyUniforms uniforms;
+	uniforms.time = static_cast<float>(glfwGetTime());
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(uniforms.time));
+	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(uniforms.color));
 
 	auto targetView = GetNextSurfaceViewData(surface);
 	if (!targetView) return;
