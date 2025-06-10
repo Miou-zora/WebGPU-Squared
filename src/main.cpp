@@ -5,6 +5,8 @@
 #include "Engine.hpp"
 #include "PluginWindow.hpp"
 #include "Window.hpp"
+#include "Object.hpp"
+#include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
 
 const char* shaderSource = R"(
@@ -21,8 +23,9 @@ struct VertexOutput {
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let ratio = 800.0 / 800.0;
-	out.position = vec4f(in.position.x, in.position.y * ratio, 0.0, 1.0);
+	let ratio = 800.0 / 800.0; // The width and height of the target surface
+	let offset = vec2f(-0.6875, -0.463); // The offset that we want to apply to the position
+	out.position = vec4f(in.position.x + offset.x, (in.position.y + offset.y) * ratio, 0.0, 1.0);
     out.color = in.color;
     return out;
 }
@@ -222,22 +225,55 @@ uint32_t indexCount = 0;
 
 void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 {
-	std::vector<float> pointData = {
-		// x,   y,     r,   g,   b
-		-0.5, -0.5,   1.0, 0.0, 0.0,
-		+0.5, -0.5,   0.0, 1.0, 0.0,
-		+0.5, +0.5,   0.0, 0.0, 1.0,
-		-0.5, +0.5,   1.0, 1.0, 0.0
-	};
-	// This is a list of indices referencing positions in the pointData
-	std::vector<uint16_t> indexData = {
-		0, 1, 2, // Triangle #0 connects points #0, #1 and #2
-		0, 2, 3  // Triangle #1 connects points #0, #2 and #3
-	};
+	// std::vector<float> pointData = {
+	// 	// x,   y,     r,   g,   b
+	// 	-0.5, -0.5,   1.0, 0.0, 0.0,
+	// 	+0.5, -0.5,   0.0, 1.0, 0.0,
+	// 	+0.5, +0.5,   0.0, 0.0, 1.0,
+	// 	-0.5, +0.5,   1.0, 1.0, 0.0
+	// };
+	// // This is a list of indices referencing positions in the pointData
+	// std::vector<uint16_t> indexData = {
+	// 	0, 1, 2, // Triangle #0 connects points #0, #1 and #2
+	// 	0, 2, 3  // Triangle #1 connects points #0, #2 and #3
+	// };
 
-	// We now store the index count rather than the vertex count
+	// // We now store the index count rather than the vertex count
+	// indexCount = static_cast<uint32_t>(indexData.size());
+
+	std::vector<float> pointData;
+	std::vector<uint16_t> indexData;
+
+	std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> texCoords;
+    std::vector<uint32_t> indices;
+
+    bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/cube.obj", vertices, normals, texCoords, indices);
+	if (!success) throw std::runtime_error("Model cant be loaded");
+
+	for (size_t i = 0; i < vertices.size(); i++) {
+		std::cout << "Vertice loaded:" << std::endl;
+		std::cout << vertices.at(i).x << std::endl;
+		std::cout << vertices.at(i).y << std::endl;
+		std::cout << normals.at(i).r << std::endl;
+		std::cout << normals.at(i).g << std::endl;
+		std::cout << normals.at(i).b << std::endl;
+		pointData.push_back(vertices.at(i).x);
+		pointData.push_back(vertices.at(i).y);
+		pointData.push_back(normals.at(i).r);
+		pointData.push_back(normals.at(i).g);
+		pointData.push_back(normals.at(i).b);
+	}
+
+	for (size_t i = 0; i < indices.size(); i++) {
+		if (i % 3 == 0)
+			std::cout << std::endl << "indices:" << std::endl;
+		std::cout << static_cast<uint16_t>(indices.at(i)) << " ";
+		indexData.push_back(static_cast<uint16_t>(indices.at(i)));
+	}
+
 	indexCount = static_cast<uint32_t>(indexData.size());
-
 
 	WGPUBufferDescriptor bufferDesc = {
 		NULL,
