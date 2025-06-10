@@ -20,11 +20,15 @@ struct VertexOutput {
     @location(0) color: vec3f,
 };
 
+@group(0) @binding(0)
+var<uniform> uTime: f32;
+
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 	let ratio = 800.0 / 800.0; // The width and height of the target surface
-	let offset = vec2f(-0.6875, -0.463); // The offset that we want to apply to the position
+	var offset = vec2f(-0.6875, -0.463);
+	offset += 0.3 * vec2f(cos(uTime), sin(uTime));
 	out.position = vec4f(in.position.x + offset.x, (in.position.y + offset.y) * ratio, 0.0, 1.0);
     out.color = in.color;
     return out;
@@ -221,7 +225,11 @@ void InspectDevice(ES::Engine::Core &core) {
 // TODO: Release them
 WGPUBuffer indexBuffer = nullptr;
 WGPUBuffer pointBuffer = nullptr;
+WGPUBuffer uniformBuffer = nullptr;
+WGPUPipelineLayout layout = nullptr;
+WGPUBindGroupLayout bindGroupLayout = nullptr;
 uint32_t indexCount = 0;
+WGPUBindGroup bindGroup = nullptr;
 
 void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 {
@@ -253,12 +261,6 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 	if (!success) throw std::runtime_error("Model cant be loaded");
 
 	for (size_t i = 0; i < vertices.size(); i++) {
-		std::cout << "Vertice loaded:" << std::endl;
-		std::cout << vertices.at(i).x << std::endl;
-		std::cout << vertices.at(i).y << std::endl;
-		std::cout << normals.at(i).r << std::endl;
-		std::cout << normals.at(i).g << std::endl;
-		std::cout << normals.at(i).b << std::endl;
 		pointData.push_back(vertices.at(i).x);
 		pointData.push_back(vertices.at(i).y);
 		pointData.push_back(normals.at(i).r);
@@ -267,9 +269,6 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 	}
 
 	for (size_t i = 0; i < indices.size(); i++) {
-		if (i % 3 == 0)
-			std::cout << std::endl << "indices:" << std::endl;
-		std::cout << static_cast<uint16_t>(indices.at(i)) << " ";
 		indexData.push_back(static_cast<uint16_t>(indices.at(i)));
 	}
 
@@ -297,6 +296,11 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 	indexBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
 
 	wgpuQueueWriteBuffer(queue, indexBuffer, 0, indexData.data(), bufferDesc.size);
+
+	bufferDesc.size = 4 * sizeof(float);
+	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+
+	uniformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
 }
 
 void InitializePipelineV2(ES::Engine::Core &core)
@@ -374,6 +378,28 @@ void InitializePipelineV2(ES::Engine::Core &core)
     vertexBufferLayout.arrayStride = 5 * sizeof(float);
     vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
 
+	// Define binding layout
+	WGPUBindGroupLayoutEntry bindingLayout = {0};
+	bindingLayout.binding = 0;
+	bindingLayout.visibility = WGPUShaderStage_Vertex;
+	bindingLayout.buffer.type = WGPUBufferBindingType_Uniform;
+	bindingLayout.buffer.minBindingSize = 4 * sizeof(float);
+
+	// Create a bind group layout
+	WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {0};
+	bindGroupLayoutDesc.nextInChain = nullptr;
+	bindGroupLayoutDesc.entryCount = 1;
+	bindGroupLayoutDesc.entries = &bindingLayout;
+	bindGroupLayoutDesc.label = toWgpuStringView("My Bind Group Layout");
+	bindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &bindGroupLayoutDesc);
+
+	// Create the pipeline layout
+	WGPUPipelineLayoutDescriptor layoutDesc = {0};
+	layoutDesc.nextInChain = nullptr;
+	layoutDesc.bindGroupLayoutCount = 1;
+	layoutDesc.bindGroupLayouts = &bindGroupLayout;
+	layout = wgpuDeviceCreatePipelineLayout(device, &layoutDesc);
+
     // When describing the render pipeline:
     pipelineDesc.vertex.bufferCount = 1;
     pipelineDesc.vertex.buffers = &vertexBufferLayout;
@@ -413,6 +439,8 @@ void InitializePipelineV2(ES::Engine::Core &core)
     fragmentState.targetCount = 1;
     fragmentState.targets = &colorTarget;
     pipelineDesc.fragment = &fragmentState;
+	pipelineDesc.label = toWgpuStringView("My Render Pipeline");
+	pipelineDesc.layout = layout;
 	WGPURenderPipeline &pipeline = core.RegisterResource(wgpuDeviceCreateRenderPipeline(device, &pipelineDesc));
 
 	if (pipeline == nullptr) throw std::runtime_error("Could not create render pipeline");
@@ -605,6 +633,21 @@ void InitWebGPU(ES::Engine::Core &core) {
 	WGPUDevice &device = core.GetResource<WGPUDevice>();
 	WGPUQueue &queue = core.GetResource<WGPUQueue>();
 	InitializeBuffers(device, queue);
+
+	// Create a binding
+	WGPUBindGroupEntry binding = {0};
+	binding.binding = 0;
+	binding.buffer = uniformBuffer;
+	binding.offset = 0;
+	binding.size = 4 * sizeof(float);
+
+	// A bind group contains one or multiple bindings
+	WGPUBindGroupDescriptor bindGroupDesc = {0};
+	bindGroupDesc.layout = bindGroupLayout;
+	bindGroupDesc.entryCount = 1;
+	bindGroupDesc.entries = &binding;
+	bindGroupDesc.label = toWgpuStringView("My Bind Group");
+	bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 }
 
 WGPUTextureView GetNextSurfaceViewData(WGPUSurface &surface){
@@ -643,6 +686,9 @@ void DrawWebGPU(ES::Engine::Core &core)
 	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot draw.");
 	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw.");
 	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw.");
+
+	float t = static_cast<float>(glfwGetTime()); // glfwGetTime returns a double
+	wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &t, sizeof(float));
 
 	auto targetView = GetNextSurfaceViewData(surface);
 	if (!targetView) return;
@@ -683,6 +729,8 @@ void DrawWebGPU(ES::Engine::Core &core)
 
 	wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, pointBuffer, 0, wgpuBufferGetSize(pointBuffer));
 	wgpuRenderPassEncoderSetIndexBuffer(renderPass, indexBuffer, WGPUIndexFormat_Uint16, 0, wgpuBufferGetSize(indexBuffer));
+
+	wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bindGroup, 0, nullptr);
 
 	// Draw 1 instance of a 3-vertices shape
 	wgpuRenderPassEncoderDrawIndexed(renderPass, indexCount, 1, 0, 0, 0);
