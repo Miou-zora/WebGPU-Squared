@@ -11,7 +11,7 @@
 
 const char* shaderSource = R"(
 struct VertexInput {
-    @location(0) position: vec2f,
+    @location(0) position: vec3f,
     @location(1) color: vec3f,
 };
 
@@ -31,10 +31,17 @@ var<uniform> uMyUniform: MyUniforms;
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-	let ratio = 800.0 / 800.0; // The width and height of the target surface
-	var offset = vec2f(-0.6875, -0.463);
-	offset += 0.3 * vec2f(cos(uMyUniform.time), sin(uMyUniform.time));
-	out.position = vec4f(in.position.x + offset.x, (in.position.y + offset.y) * ratio, 0.0, 1.0);
+    let ratio = 800.0 / 800.0;
+    var offset = vec2f(0.0, 0.0);
+	let angle = uMyUniform.time; // you can multiply it go rotate faster
+	let alpha = cos(angle);
+	let beta = sin(angle);
+	var position = vec3f(
+		in.position.x,
+		alpha * in.position.y + beta * in.position.z,
+		alpha * in.position.z - beta * in.position.y,
+	);
+	out.position = vec4f(position.x, position.y * ratio, 0.0, 1.0);
     out.color = in.color;
     return out;
 }
@@ -233,10 +240,11 @@ void InspectDevice(ES::Engine::Core &core) {
 
     bool success = wgpuDeviceGetLimits(device, &limits) == WGPUStatus_Success;
 
-	uniformStride = ceilToNextMultiple(
-		(uint32_t)sizeof(MyUniforms),
-		(uint32_t)limits.minUniformBufferOffsetAlignment
-	);
+	// uniformStride = ceilToNextMultiple(
+	// 	(uint32_t)sizeof(MyUniforms),
+	// 	(uint32_t)limits.minUniformBufferOffsetAlignment
+	// );
+	uniformStride = 0;
 
 	if (!success) throw std::runtime_error("Failed to get device limits");
 
@@ -266,12 +274,13 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
     std::vector<glm::vec2> texCoords;
     std::vector<uint32_t> indices;
 
-    bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/cube.obj", vertices, normals, texCoords, indices);
+    bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/pyramide.obj", vertices, normals, texCoords, indices);
 	if (!success) throw std::runtime_error("Model cant be loaded");
 
 	for (size_t i = 0; i < vertices.size(); i++) {
 		pointData.push_back(vertices.at(i).x);
 		pointData.push_back(vertices.at(i).y);
+		pointData.push_back(vertices.at(i).z);
 		pointData.push_back(normals.at(i).r);
 		pointData.push_back(normals.at(i).g);
 		pointData.push_back(normals.at(i).b);
@@ -306,7 +315,7 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 
 	wgpuQueueWriteBuffer(queue, indexBuffer, 0, indexData.data(), bufferDesc.size);
 
-	bufferDesc.size = uniformStride + sizeof(MyUniforms);
+	bufferDesc.size = sizeof(MyUniforms);
 	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
 	uniformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
 
@@ -378,18 +387,18 @@ void InitializePipelineV2(ES::Engine::Core &core)
 
     // Describe the position attribute
     vertexAttribs[0].shaderLocation = 0;
-    vertexAttribs[0].format = WGPUVertexFormat_Float32x2;
+    vertexAttribs[0].format = WGPUVertexFormat_Float32x3;
     vertexAttribs[0].offset = 0;
 
     // Describe the color attribute
     vertexAttribs[1].shaderLocation = 1;
     vertexAttribs[1].format = WGPUVertexFormat_Float32x3;
-    vertexAttribs[1].offset = 2 * sizeof(float);
+    vertexAttribs[1].offset = 3 * sizeof(float);
 
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 5 * sizeof(float);
+    vertexBufferLayout.arrayStride = 6 * sizeof(float);
     vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
 
 	// Define binding layout
@@ -398,7 +407,6 @@ void InitializePipelineV2(ES::Engine::Core &core)
 	bindingLayout.visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
 	bindingLayout.buffer.type = WGPUBufferBindingType_Uniform;
 	bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
-	bindingLayout.buffer.hasDynamicOffset = true;
 
 	// Create a bind group layout
 	WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {0};
@@ -704,13 +712,9 @@ void DrawWebGPU(ES::Engine::Core &core)
 
 	MyUniforms uniforms;
 
-	uniforms.time = 1.0f;
+	uniforms.time = glfwGetTime();
 	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
 	wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniforms, sizeof(uniforms));
-
-	uniforms.time = -1.0f;
-	uniforms.color = { 1.0f, 1.0f, 1.0f, 0.7f };
-	wgpuQueueWriteBuffer(queue, uniformBuffer, uniformStride, &uniforms, sizeof(uniforms));
 
 	auto targetView = GetNextSurfaceViewData(surface);
 	if (!targetView) return;
@@ -751,16 +755,8 @@ void DrawWebGPU(ES::Engine::Core &core)
 	wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, pointBuffer, 0, wgpuBufferGetSize(pointBuffer));
 	wgpuRenderPassEncoderSetIndexBuffer(renderPass, indexBuffer, WGPUIndexFormat_Uint16, 0, wgpuBufferGetSize(indexBuffer));
 
-	uint32_t dynamicOffset = 0;
-
 	// Set binding group
-	dynamicOffset = 0 * uniformStride;
-	wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bindGroup, 1, &dynamicOffset);
-	wgpuRenderPassEncoderDrawIndexed(renderPass, indexCount, 1, 0, 0, 0);
-
-	// Set binding group with a different uniform offset
-	dynamicOffset = 1 * uniformStride;
-	wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bindGroup, 1, &dynamicOffset);
+	wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bindGroup, 0, nullptr);
 	wgpuRenderPassEncoderDrawIndexed(renderPass, indexCount, 1, 0, 0, 0);
 
 	wgpuRenderPassEncoderEnd(renderPass);
