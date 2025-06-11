@@ -41,7 +41,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 		alpha * in.position.y + beta * in.position.z,
 		alpha * in.position.z - beta * in.position.y,
 	);
-	out.position = vec4f(position.x, position.y * ratio, 0.0, 1.0);
+	out.position = vec4f(position.x, position.y * ratio, position.z * 0.5 + 0.5, 1.0);
     out.color = in.color;
     return out;
 }
@@ -263,6 +263,8 @@ WGPUPipelineLayout layout = nullptr;
 WGPUBindGroupLayout bindGroupLayout = nullptr;
 uint32_t indexCount = 0;
 WGPUBindGroup bindGroup = nullptr;
+WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+WGPUTextureView depthTextureView = nullptr;
 
 void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 {
@@ -464,6 +466,28 @@ void InitializePipelineV2(ES::Engine::Core &core)
     pipelineDesc.fragment = &fragmentState;
 	pipelineDesc.label = toWgpuStringView("My Render Pipeline");
 	pipelineDesc.layout = layout;
+
+	WGPUTextureDescriptor depthTextureDesc = {0};
+	depthTextureDesc.label = toWgpuStringView("Z Buffer");
+	depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+	depthTextureDesc.size = { 640, 480, 1 };
+	depthTextureDesc.format = depthTextureFormat;
+	depthTextureDesc.mipLevelCount = 1;
+	depthTextureDesc.sampleCount = 1;
+	WGPUTexture depthTexture = wgpuDeviceCreateTexture(device, &depthTextureDesc);
+
+	// Create the view of the depth texture manipulated by the rasterizer
+	depthTextureView = wgpuTextureCreateView(depthTexture, nullptr);
+
+	// We can now release the texture and only hold to the view
+	wgpuTextureRelease(depthTexture);
+
+	WGPUDepthStencilState depthStencilState = {0};
+	depthStencilState.depthCompare = WGPUCompareFunction_Less;
+	depthStencilState.depthWriteEnabled = WGPUOptionalBool_True;
+	depthStencilState.format = depthTextureFormat;
+	pipelineDesc.depthStencil = &depthStencilState;
+
 	WGPURenderPipeline &pipeline = core.RegisterResource(wgpuDeviceCreateRenderPipeline(device, &pipelineDesc));
 
 	if (pipeline == nullptr) throw std::runtime_error("Could not create render pipeline");
@@ -746,6 +770,12 @@ void DrawWebGPU(ES::Engine::Core &core)
 	renderPassDesc.depthStencilAttachment = nullptr;
 	renderPassDesc.timestampWrites = nullptr;
 	renderPassDesc.label = toWgpuStringView("My render pass");
+	WGPURenderPassDepthStencilAttachment depthStencilAttachment = {0};
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthClearValue = 1.0f;
+	depthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
+	depthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
 
 	// Create the render pass and end it immediately (we only clear the screen but do not draw anything)
 	WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
