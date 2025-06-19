@@ -1,3 +1,7 @@
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_LEFT_HANDED
+#include <glm/ext.hpp>
+
 #include <webgpu/webgpu.h>
 #include <glfw3webgpu.h>
 #include <iostream>
@@ -8,14 +12,19 @@
 #include "Window.hpp"
 #include "Object.hpp"
 #include <glm/glm.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <GLFW/glfw3.h>
 
 struct MyUniforms {
-    std::array<float, 4> color;
+	glm::mat4x4 projectionMatrix;
+    glm::mat4x4 viewMatrix;
+    glm::mat4x4 modelMatrix;
+    glm::vec4 color;
     float time;
-	float _pad[3];
+    float _pad[3];
 };
 
+// This assert should stay here as we want this rule to link struct to webgpu struct
 static_assert(sizeof(MyUniforms) % 16 == 0);
 
 uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
@@ -195,13 +204,14 @@ void InspectDevice(ES::Engine::Core &core) {
 
     WGPULimits limits = {0};
     limits.nextInChain = nullptr;
+	limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
 
     bool success = wgpuDeviceGetLimits(device, &limits) == WGPUStatus_Success;
 
-	// uniformStride = ceilToNextMultiple(
-	// 	(uint32_t)sizeof(MyUniforms),
-	// 	(uint32_t)limits.minUniformBufferOffsetAlignment
-	// );
+	uniformStride = ceilToNextMultiple(
+		(uint32_t)sizeof(MyUniforms),
+		(uint32_t)limits.minUniformBufferOffsetAlignment
+	);
 	uniformStride = 0;
 
 	if (!success) throw std::runtime_error("Failed to get device limits");
@@ -283,6 +293,11 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
 	MyUniforms uniforms;
 	uniforms.time = 1.0f;
 	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	float near = 0.001f;
+	float far = 100.0f;
+	float ratio = 800.0f / 800.0f;
+	float fov = glm::radians(45.0f);
+	uniforms.projectionMatrix = glm::perspective(fov, ratio, near, far);
 	wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniforms, sizeof(uniforms));
 }
 
@@ -441,7 +456,7 @@ void InitializePipelineV2(ES::Engine::Core &core)
 	WGPUTextureDescriptor depthTextureDesc = {0};
 	depthTextureDesc.label = toWgpuStringView("Z Buffer");
 	depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
-	depthTextureDesc.size = { 640, 480, 1 };
+	depthTextureDesc.size = { 800, 800, 1 };
 	depthTextureDesc.format = depthTextureFormat;
 	depthTextureDesc.mipLevelCount = 1;
 	depthTextureDesc.sampleCount = 1;
@@ -605,8 +620,8 @@ void ConfigureSurface(ES::Engine::Core &core) {
 
 	WGPUSurfaceConfiguration config = {};
 	config.nextInChain = nullptr;
-	config.width = 640;
-	config.height = 480;
+	config.width = 800;
+	config.height = 800;
 	config.usage = WGPUTextureUsage_RenderAttachment;
 	config.format = capabilities.formats[0];
 	config.viewFormatCount = 0;
@@ -678,7 +693,7 @@ WGPUTextureView GetNextSurfaceViewData(WGPUSurface &surface){
 	}
 
 	// Create a view for this surface texture
-	WGPUTextureViewDescriptor viewDescriptor;
+	WGPUTextureViewDescriptor viewDescriptor {0};
 	viewDescriptor.nextInChain = nullptr;
 	viewDescriptor.label = toWgpuStringView("Surface texture view");
 	viewDescriptor.format = wgpuTextureGetFormat(surfaceTexture.texture);
@@ -709,7 +724,29 @@ void DrawWebGPU(ES::Engine::Core &core)
 
 	uniforms.time = glfwGetTime();
 	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
-	wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniforms, sizeof(uniforms));
+	float near = 0.001f;
+	float far = 100.0f;
+	float ratio = 800.0f / 800.0f;
+	float fov = glm::radians(45.0f);
+	uniforms.projectionMatrix = glm::perspective(fov, ratio, near, far);
+
+	glm::vec3 focalPoint(0.0, 0.0, -2.0);
+	float angle2 = 3.0 * glm::pi<float>() / 4.0;
+	auto R2 = glm::rotate(glm::mat4x4(1.0), -angle2, glm::vec3(1.0, 0.0, 0.0));
+	auto T2 = glm::translate(glm::mat4x4(1.0), -focalPoint);
+	uniforms.viewMatrix = T2 * R2;
+
+	float angle1 = uniforms.time;
+	glm::mat4x4 M(1.0);
+	M = glm::rotate(M, angle1, glm::vec3(0.0, 0.0, 1.0));
+	M = glm::translate(M, glm::vec3(0.5, 0.0, 0.0));
+	M = glm::scale(M, glm::vec3(0.3f));
+	uniforms.modelMatrix = M;
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(MyUniforms::time));
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(MyUniforms::color));
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, modelMatrix), &uniforms.modelMatrix, sizeof(MyUniforms::modelMatrix));
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
+	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
 
 	auto targetView = GetNextSurfaceViewData(surface);
 	if (!targetView) return;
