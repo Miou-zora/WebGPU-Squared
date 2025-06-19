@@ -234,8 +234,14 @@ WGPUBindGroup bindGroup = nullptr;
 WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth24Plus;
 WGPUTextureView depthTextureView = nullptr;
 
-void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
+void InitializeBuffers(ES::Engine::Core &core)
 {
+	WGPUQueue &queue = core.GetResource<WGPUQueue>();
+	WGPUDevice &device = core.GetResource<WGPUDevice>();
+
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot initialize buffers.");
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize buffers.");
+
 	std::vector<float> pointData;
 	std::vector<uint16_t> indexData;
 
@@ -244,7 +250,7 @@ void InitializeBuffers(WGPUDevice device, WGPUQueue queue)
     std::vector<glm::vec2> texCoords;
     std::vector<uint32_t> indices;
 
-    bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/pyramide.obj", vertices, normals, texCoords, indices);
+    bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
 	if (!success) throw std::runtime_error("Model cant be loaded");
 
 	for (size_t i = 0; i < vertices.size(); i++) {
@@ -312,7 +318,7 @@ std::string loadFile(const std::string &filePath) {
 	return buffer.str();
 }
 
-void InitializePipelineV2(ES::Engine::Core &core)
+void InitializePipeline(ES::Engine::Core &core)
 {
 	WGPUDevice &device = core.GetResource<WGPUDevice>();
 	WGPUTextureFormat surfaceFormat = core.GetResource<WGPUSurfaceCapabilities>().formats[0];
@@ -646,26 +652,11 @@ void ReleaseAdapter(ES::Engine::Core &core)
 	ES::Utils::Log::Info("WebGPU adapter released.");
 }
 
-void InitWebGPU(ES::Engine::Core &core) {
-	CreateInstance(core);
-	CreateSurface(core);
-	CreateAdapter(core);
-	AdaptaterPrintLimits(core);
-	AdaptaterPrintFeatures(core);
-	AdaptaterPrintProperties(core);
-	ReleaseInstance(core);
-	RequestCapabilities(core);
-	CreateDevice(core);
-	CreateQueue(core);
-	SetupQueueOnSubmittedWorkDone(core);
-	ConfigureSurface(core);
-	ReleaseAdapter(core);
-	InspectDevice(core);
-	InitializePipelineV2(core);
-
+void CreateBindingGroup(ES::Engine::Core &core)
+{
 	WGPUDevice &device = core.GetResource<WGPUDevice>();
-	WGPUQueue &queue = core.GetResource<WGPUQueue>();
-	InitializeBuffers(device, queue);
+
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot create binding group.");
 
 	// Create a binding
 	WGPUBindGroupEntry binding = {0};
@@ -681,6 +672,28 @@ void InitWebGPU(ES::Engine::Core &core) {
 	bindGroupDesc.entries = &binding;
 	bindGroupDesc.label = toWgpuStringView("My Bind Group");
 	bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+
+	if (bindGroup == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
+}
+
+void InitWebGPU(ES::Engine::Core &core) {
+	CreateInstance(core);
+	CreateSurface(core);
+	CreateAdapter(core);
+	AdaptaterPrintLimits(core);
+	AdaptaterPrintFeatures(core);
+	AdaptaterPrintProperties(core);
+	ReleaseInstance(core);
+	RequestCapabilities(core);
+	CreateDevice(core);
+	CreateQueue(core);
+	SetupQueueOnSubmittedWorkDone(core);
+	ConfigureSurface(core);
+	ReleaseAdapter(core);
+	InspectDevice(core);
+	InitializePipeline(core);
+	InitializeBuffers(core);
+	CreateBindingGroup(core);
 }
 
 WGPUTextureView GetNextSurfaceViewData(WGPUSurface &surface){
@@ -730,7 +743,7 @@ void DrawWebGPU(ES::Engine::Core &core)
 	float fov = glm::radians(45.0f);
 	uniforms.projectionMatrix = glm::perspective(fov, ratio, near, far);
 
-	glm::vec3 focalPoint(0.0, 0.0, -2.0);
+	glm::vec3 focalPoint(0.0, 0.0, -3.0);
 	float angle2 = 3.0 * glm::pi<float>() / 4.0;
 	auto R2 = glm::rotate(glm::mat4x4(1.0), -angle2, glm::vec3(1.0, 0.0, 0.0));
 	auto T2 = glm::translate(glm::mat4x4(1.0), -focalPoint);
@@ -740,7 +753,7 @@ void DrawWebGPU(ES::Engine::Core &core)
 	glm::mat4x4 M(1.0);
 	M = glm::rotate(M, angle1, glm::vec3(0.0, 0.0, 1.0));
 	M = glm::translate(M, glm::vec3(0.5, 0.0, 0.0));
-	M = glm::scale(M, glm::vec3(0.3f));
+	M = glm::scale(M, glm::vec3(0.2f));
 	uniforms.modelMatrix = M;
 	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(MyUniforms::time));
 	wgpuQueueWriteBuffer(queue, uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(MyUniforms::color));
@@ -859,26 +872,52 @@ void ReleasePipeline(ES::Engine::Core &core)
 	}
 }
 
+namespace ES::Plugin::WebGPU {
+class Plugin : public ES::Engine::APlugin {
+  public:
+    using APlugin::APlugin;
+    ~Plugin() = default;
+
+    void Bind() final {
+		RequirePlugins<ES::Plugin::Window::Plugin>();
+
+		RegisterSystems<ES::Engine::Scheduler::Startup>(
+			CreateInstance,
+			CreateSurface,
+			CreateAdapter,
+			AdaptaterPrintLimits,
+			AdaptaterPrintFeatures,
+			AdaptaterPrintProperties,
+			ReleaseInstance,
+			RequestCapabilities,
+			CreateDevice,
+			CreateQueue,
+			SetupQueueOnSubmittedWorkDone,
+			ConfigureSurface,
+			ReleaseAdapter,
+			InspectDevice,
+			InitializePipeline,
+			InitializeBuffers,
+			CreateBindingGroup
+		);
+		RegisterSystems<ES::Engine::Scheduler::Update>(
+			DrawWebGPU
+		);
+		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
+			ReleaseDevice,
+			ReleaseSurface,
+			ReleaseQueue,
+			ReleasePipeline
+		);
+	}
+};
+}
+
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
 
-	core.AddPlugins<ES::Plugin::Window::Plugin>();
-
-	core.RegisterSystem<ES::Engine::Scheduler::Startup>(
-		InitWebGPU
-	);
-
-	core.RegisterSystem<ES::Engine::Scheduler::Update>(
-		DrawWebGPU
-	);
-
-	core.RegisterSystem<ES::Engine::Scheduler::Shutdown>(
-		ReleaseDevice,
-		ReleaseSurface,
-		ReleaseQueue,
-		ReleasePipeline
-	);
+	core.AddPlugins<ES::Plugin::WebGPU::Plugin>();
 
 	core.RunCore();
 
