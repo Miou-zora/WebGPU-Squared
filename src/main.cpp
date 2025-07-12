@@ -10,11 +10,13 @@
 #include <fstream>
 #include "Engine.hpp"
 #include "PluginWindow.hpp"
+#include "Input.hpp"
 #include "Window.hpp"
 #include "Object.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <GLFW/glfw3.h>
+#include "RenderingPipeline.hpp"
 
 struct MyUniforms {
 	glm::mat4x4 projectionMatrix;
@@ -23,6 +25,17 @@ struct MyUniforms {
     glm::vec4 color;
     float time;
     float _pad[3];
+};
+
+struct CameraData {
+	glm::vec3 position;
+	float yaw; // Yaw angle in radians
+	float pitch; // Pitch angle in radians
+	glm::vec3 up;
+	float fovY; // Field of view in radians
+	float nearPlane;
+	float farPlane;
+	float aspectRatio;
 };
 
 // This assert should stay here as we want this rule to link struct to webgpu struct
@@ -416,6 +429,8 @@ void CreateSurface(ES::Engine::Core &core) {
 
 	wgpu::Surface &surface = core.RegisterResource(wgpu::Surface(glfwCreateWindowWGPUSurface(instance, glfwWindow)));
 
+	glfwMakeContextCurrent(glfwWindow);
+
 	if (surface == nullptr) throw std::runtime_error("Could not create surface");
 
 	ES::Utils::Log::Info(fmt::format("Surface created: {}", static_cast<void*>(surface)));
@@ -634,17 +649,24 @@ void DrawWebGPU(ES::Engine::Core &core)
 
 	uniforms.time = glfwGetTime();
 	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
-	float near = 0.001f;
-	float far = 100.0f;
-	float ratio = 800.0f / 800.0f;
-	float fov = glm::radians(45.0f);
-	uniforms.projectionMatrix = glm::perspective(fov, ratio, near, far);
 
-	glm::vec3 focalPoint(0.0, 0.0, -3.0);
-	float angle2 = 3.0 * glm::pi<float>() / 4.0;
-	auto R2 = glm::rotate(glm::mat4x4(1.0), -angle2, glm::vec3(1.0, 0.0, 0.0));
-	auto T2 = glm::translate(glm::mat4x4(1.0), -focalPoint);
-	uniforms.viewMatrix = T2 * R2;
+	CameraData cameraData = core.GetResource<CameraData>();
+	uniforms.viewMatrix = glm::lookAt(
+		cameraData.position,
+		cameraData.position + glm::vec3(
+			glm::cos(cameraData.yaw) * glm::cos(cameraData.pitch),
+			glm::sin(cameraData.pitch),
+			glm::sin(cameraData.yaw) * glm::cos(cameraData.pitch)
+		),
+		cameraData.up
+	);
+
+	uniforms.projectionMatrix = glm::perspective(
+		cameraData.fovY,
+		cameraData.aspectRatio,
+		cameraData.nearPlane,
+		cameraData.farPlane
+	);
 
 	float angle1 = uniforms.time;
 	glm::mat4x4 M(1.0);
@@ -776,7 +798,7 @@ class Plugin : public ES::Engine::APlugin {
     void Bind() final {
 		RequirePlugins<ES::Plugin::Window::Plugin>();
 
-		RegisterSystems<ES::Engine::Scheduler::Startup>(
+		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
 			CreateInstance,
 			CreateSurface,
 			CreateAdapter,
@@ -795,7 +817,7 @@ class Plugin : public ES::Engine::APlugin {
 			InitializeBuffers,
 			CreateBindingGroup
 		);
-		RegisterSystems<ES::Engine::Scheduler::Update>(
+		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
 			DrawWebGPU
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
@@ -808,11 +830,103 @@ class Plugin : public ES::Engine::APlugin {
 };
 }
 
+static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
+{
+    glm::vec3 force(0.0f, 0.0f, 0.0f);
+	auto &inputManager = core.GetResource<ES::Plugin::Input::Resource::InputManager>();
+
+    if (inputManager.IsKeyPressed(GLFW_KEY_W)) {
+        force.z += 1.0f;
+    }
+    if (inputManager.IsKeyPressed(GLFW_KEY_S)) {
+        force.z -= 1.0f;
+    }
+    if (inputManager.IsKeyPressed(GLFW_KEY_A)) {
+        force.x -= 1.0f;
+    }
+    if (inputManager.IsKeyPressed(GLFW_KEY_D)) {
+        force.x += 1.0f;
+    }
+
+    if (glm::length(force) > 1.0f) {
+        force = glm::normalize(force);
+    }
+
+    return force;
+}
+
+void MovementSystem(ES::Engine::Core &core)
+{
+	auto &cameraData = core.GetResource<CameraData>();
+
+	glm::vec3 movementForce = GetKeyboardMovementForce(core);
+	if (glm::length(movementForce) > 0.0f) {
+		cameraData.position += movementForce * 0.04f;
+	}
+
+}
+
+glm::vec2 lastCursorPos(0.0f, 0.0f);
+
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
 
-	core.AddPlugins<ES::Plugin::WebGPU::Plugin>();
+	core.AddPlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin>();
+
+	core.RegisterResource<CameraData>({
+		.position = { 0.0f, 3.0f, 3.0f },
+		.yaw = 4.75f,
+		.pitch = -0.75f,
+		.up = { 0.0f, 1.0f, 0.0f },
+		.fovY = glm::radians(45.0f),
+		.nearPlane = 0.001f,
+		.farPlane = 100.0f,
+		.aspectRatio = 800.0f / 800.0f
+	});
+
+	core.RegisterSystem(MovementSystem);
+	core.RegisterSystem([](ES::Engine::Core &core) {
+		auto &cameraData = core.GetResource<CameraData>();
+	});
+
+	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
+		// lock cursor position to the center of the window
+		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+		glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+
+
+		auto &inputManager = core.GetResource<ES::Plugin::Input::Resource::InputManager>();
+
+		inputManager.RegisterScrollCallback([&](ES::Engine::Core &, double, double y) {
+			auto &cameraData = core.GetResource<CameraData>();
+			static float sensitivity = 0.01f;
+			cameraData.fovY += sensitivity * static_cast<float>(-y);
+			cameraData.fovY = glm::clamp(cameraData.fovY, glm::radians(0.1f), glm::radians(179.9f));
+		});
+
+		inputManager.RegisterKeyCallback([](ES::Engine::Core &cbCore, int key, int, int action, int) {
+			if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+				cbCore.Stop();
+			}
+		});
+
+		inputManager.RegisterCursorPosCallback([&](ES::Engine::Core &, double x, double y) {
+			auto &cameraData = core.GetResource<CameraData>();
+			auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+			glm::vec2 windowSize = window.GetSize();
+			
+			glm::vec2 cursorOffset = { x - lastCursorPos.x, y - lastCursorPos.y };
+			lastCursorPos = { x, y };
+			
+			static float sensitivity = 0.003f;
+			cameraData.yaw += sensitivity * -cursorOffset.x;
+			cameraData.pitch += sensitivity * -cursorOffset.y;
+			cameraData.pitch = glm::clamp(cameraData.pitch, glm::radians(-89.0f), glm::radians(89.0f));
+			std::cout << "Yaw: " << cameraData.yaw << ", Pitch: " << cameraData.pitch << std::endl;
+		});
+	});
 
 	core.RunCore();
 
