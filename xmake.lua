@@ -114,5 +114,7 @@ target(project_name)
     add_packages("glfw3webgpuq")
 
     add_files("src/**.cpp")
+    add_headerfiles("src/**.hpp", { public = true })
+    add_includedirs("src/", {public = true})
 
     set_rundir("$(projectdir)")
