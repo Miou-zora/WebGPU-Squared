@@ -33,7 +33,7 @@ uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
     return step * divide_and_ceil;
 }
 
-std::string_view toStdStringView(WGPUStringView wgpuStringView) {
+std::string_view toStdStringView(wgpu::StringView wgpuStringView) {
     return
         wgpuStringView.data == nullptr
         ? std::string_view()
@@ -42,14 +42,14 @@ std::string_view toStdStringView(WGPUStringView wgpuStringView) {
         : std::string_view(wgpuStringView.data, wgpuStringView.length);
 }
 
-WGPUStringView toWgpuStringView(std::string_view stdStringView) {
-    return { stdStringView.data(), stdStringView.size() };
+wgpu::StringView toWgpuStringView(std::string_view stdStringView) {
+    return wgpu::StringView(stdStringView);
 }
 WGPUStringView toWgpuStringView(const char* cString) {
     return { cString, WGPU_STRLEN };
 }
 
-auto requestAdapterSync(wgpu::Instance instance, WGPURequestAdapterOptions const * options)
+auto requestAdapterSync(wgpu::Instance instance, wgpu::RequestAdapterOptions const &options)
 	-> wgpu::Adapter
 {
     struct UserData {
@@ -158,7 +158,7 @@ wgpu::Device requestDeviceSync(const wgpu::Adapter &adapter, wgpu::DeviceDescrip
     auto onDeviceRequestEnded = []
 	(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2) {
         UserData& userData = *reinterpret_cast<UserData*>(userdata1);
-        if (status == WGPURequestDeviceStatus_Success) {
+        if (status == wgpu::RequestDeviceStatus::Success) {
             userData.device = device;
         } else {
 			userData.device = nullptr;
@@ -190,20 +190,19 @@ void InspectDevice(ES::Engine::Core &core) {
     const wgpu::Device &device = core.GetResource<wgpu::Device>();
     if (device == nullptr) throw std::runtime_error("Device is not created, cannot inspect it.");
 
-    WGPUSupportedFeatures features = {};
-    wgpuDeviceGetFeatures(device, &features);
+    wgpu::SupportedFeatures features(wgpu::Default);
+    device.getFeatures(&features);
 
     ES::Utils::Log::Info("Device features:");
     for (size_t i = 0; i < features.featureCount; ++i) {
         ES::Utils::Log::Info(fmt::format(" - 0x{:x}", static_cast<uint32_t>(features.features[i])));
     }
-    wgpuSupportedFeaturesFreeMembers(features);
+    features.freeMembers();
 
-    WGPULimits limits = {0};
-    limits.nextInChain = nullptr;
-	limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
+    wgpu::Limits limits(wgpu::Default);
+    limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
 
-    bool success = wgpuDeviceGetLimits(device, &limits) == WGPUStatus_Success;
+    bool success = device.getLimits(&limits) == wgpu::Status::Success;
 
 	uniformStride = ceilToNextMultiple(
 		(uint32_t)sizeof(MyUniforms),
@@ -265,17 +264,11 @@ void InitializeBuffers(ES::Engine::Core &core)
 
 	indexCount = static_cast<uint32_t>(indexData.size());
 
-	WGPUBufferDescriptor bufferDesc = {
-		NULL,
-		toWgpuStringView(NULL),
-		WGPUBufferUsage_None,
-		0,
-		false
-	};
-	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+	wgpu::BufferDescriptor bufferDesc(wgpu::Default);
+	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
 	bufferDesc.mappedAtCreation = false;
 	bufferDesc.size = pointData.size() * sizeof(float);
-	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex; // Vertex usage here!
+	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex; // Vertex usage here!
 	pointBuffer = device.createBuffer(bufferDesc);
 
 	queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
@@ -452,7 +445,7 @@ void CreateAdapter(ES::Engine::Core &core) {
 	wgpu::RequestAdapterOptions adapterOpts(wgpu::Default);
 	adapterOpts.compatibleSurface = surface;
 
-	wgpu::Adapter adapter = core.RegisterResource(requestAdapterSync(instance, &adapterOpts));
+	wgpu::Adapter adapter = core.RegisterResource(requestAdapterSync(instance, adapterOpts));
 
 	if (adapter == nullptr) throw std::runtime_error("Could not get WebGPU adapter");
 
@@ -552,17 +545,16 @@ void ConfigureSurface(ES::Engine::Core &core) {
 	if (surface == nullptr) throw std::runtime_error("Surface is not created, cannot configure it.");
 	if (device == nullptr) throw std::runtime_error("Device is not created, cannot configure surface.");
 
-	wgpu::SurfaceConfiguration config = {};
-	config.nextInChain = nullptr;
+	wgpu::SurfaceConfiguration config(wgpu::Default);
 	config.width = 800;
 	config.height = 800;
-	config.usage = WGPUTextureUsage_RenderAttachment;
+	config.usage = wgpu::TextureUsage::RenderAttachment;
 	config.format = capabilities.formats[0];
 	config.viewFormatCount = 0;
 	config.viewFormats = nullptr;
 	config.device = device;
-	config.presentMode = WGPUPresentMode_Fifo;
-	config.alphaMode = WGPUCompositeAlphaMode_Auto;
+	config.presentMode = wgpu::PresentMode::Fifo;
+	config.alphaMode = wgpu::CompositeAlphaMode::Auto;
 
 	wgpuSurfaceConfigure(surface, &config);
 }
