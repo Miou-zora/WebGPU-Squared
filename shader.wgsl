@@ -1,11 +1,11 @@
 struct VertexInput {
     @location(0) position: vec3f,
-    @location(1) color: vec3f,
+    @location(1) normal: vec3f,
 };
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
-    @location(0) color: vec3f,
+    @location(0) normal: vec3f,
 };
 
 struct MyUniforms {
@@ -26,11 +26,11 @@ var<uniform> uMyUniform: MyUniforms;
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.position = uMyUniform.projectionMatrix * uMyUniform.viewMatrix * uMyUniform.modelMatrix * vec4f(in.position, 1.0);
-    out.color = in.color;
+    out.normal = in.normal;
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return vec4f(in.color, 1.0) * uMyUniform.color;
+    return vec4f(in.normal, 1.0) * uMyUniform.color;
 }
