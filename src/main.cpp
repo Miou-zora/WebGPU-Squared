@@ -55,13 +55,6 @@ std::string_view toStdStringView(wgpu::StringView wgpuStringView) {
         : std::string_view(wgpuStringView.data, wgpuStringView.length);
 }
 
-wgpu::StringView toWgpuStringView(std::string_view stdStringView) {
-    return wgpu::StringView(stdStringView);
-}
-WGPUStringView toWgpuStringView(const char* cString) {
-    return { cString, WGPU_STRLEN };
-}
-
 auto requestAdapterSync(wgpu::Instance instance, wgpu::RequestAdapterOptions const &options)
 	-> wgpu::Adapter
 {
@@ -232,13 +225,61 @@ void InspectDevice(ES::Engine::Core &core) {
 	ES::Utils::Log::Info(fmt::format(" - maxTextureArrayLayers: {}", limits.maxTextureArrayLayers));
 }
 
+struct Mesh {
+	wgpu::Buffer pointBuffer = nullptr;
+	wgpu::Buffer indexBuffer = nullptr;
+	uint32_t indexCount = 0;
+
+	Mesh() = default;
+
+	Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const std::vector<glm::vec3> &normals, const std::vector<uint32_t> &indices) {
+		auto &device = core.GetResource<wgpu::Device>();
+		auto &queue = core.GetResource<wgpu::Queue>();
+
+		std::vector<float> pointData;
+		for (size_t i = 0; i < vertices.size(); i++) {
+			pointData.push_back(vertices.at(i).x);
+			pointData.push_back(vertices.at(i).y);
+			pointData.push_back(vertices.at(i).z);
+			pointData.push_back(normals.at(i).r);
+			pointData.push_back(normals.at(i).g);
+			pointData.push_back(normals.at(i).b);
+		}
+
+
+		std::vector<uint16_t> indexData;
+		for (size_t i = 0; i < indices.size(); i++) {
+			indexData.push_back(static_cast<uint16_t>(indices.at(i)));
+		}
+
+		indexCount = static_cast<uint32_t>(indexData.size());
+
+		wgpu::BufferDescriptor bufferDesc(wgpu::Default);
+		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
+		bufferDesc.mappedAtCreation = false;
+		bufferDesc.size = pointData.size() * sizeof(float);
+		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex; // Vertex usage here!
+		pointBuffer = device.createBuffer(bufferDesc);
+
+		queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
+
+		bufferDesc.size = indexData.size() * sizeof(uint16_t);
+		indexData.resize((indexData.size() + 1) & ~1);
+		bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
+		indexBuffer = device.createBuffer(bufferDesc);
+
+		queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
+	}
+};
+
 // TODO: Release them
-wgpu::Buffer indexBuffer = nullptr;
-wgpu::Buffer pointBuffer = nullptr;
+Mesh mesh;
+// wgpu::Buffer indexBuffer = nullptr;
+// wgpu::Buffer pointBuffer = nullptr;
 wgpu::Buffer uniformBuffer = nullptr;
 wgpu::PipelineLayout layout = nullptr;
 wgpu::BindGroupLayout bindGroupLayout = nullptr;
-uint32_t indexCount = 0;
+// uint32_t indexCount = 0;
 wgpu::BindGroup bindGroup = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 wgpu::TextureView depthTextureView = nullptr;
@@ -251,9 +292,6 @@ void InitializeBuffers(ES::Engine::Core &core)
 	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot initialize buffers.");
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize buffers.");
 
-	std::vector<float> pointData;
-	std::vector<uint16_t> indexData;
-
 	std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texCoords;
@@ -262,38 +300,9 @@ void InitializeBuffers(ES::Engine::Core &core)
     bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
 	if (!success) throw std::runtime_error("Model cant be loaded");
 
-	for (size_t i = 0; i < vertices.size(); i++) {
-		pointData.push_back(vertices.at(i).x);
-		pointData.push_back(vertices.at(i).y);
-		pointData.push_back(vertices.at(i).z);
-		pointData.push_back(normals.at(i).r);
-		pointData.push_back(normals.at(i).g);
-		pointData.push_back(normals.at(i).b);
-	}
-
-	for (size_t i = 0; i < indices.size(); i++) {
-		indexData.push_back(static_cast<uint16_t>(indices.at(i)));
-	}
-
-	indexCount = static_cast<uint32_t>(indexData.size());
+	mesh = Mesh(core, vertices, normals, indices);
 
 	wgpu::BufferDescriptor bufferDesc(wgpu::Default);
-	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
-	bufferDesc.mappedAtCreation = false;
-	bufferDesc.size = pointData.size() * sizeof(float);
-	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex; // Vertex usage here!
-	pointBuffer = device.createBuffer(bufferDesc);
-
-	queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
-
-	bufferDesc.size = indexData.size() * sizeof(uint16_t);
-	bufferDesc.size = (bufferDesc.size + 3) & ~3;
-	indexData.resize((indexData.size() + 1) & ~1);
-	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
-	indexBuffer = device.createBuffer(bufferDesc);
-
-	queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
-
 	bufferDesc.size = sizeof(MyUniforms);
 	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
 	uniformBuffer = device.createBuffer(bufferDesc);
@@ -721,12 +730,12 @@ void DrawWebGPU(ES::Engine::Core &core)
 
 		// Select which render pipeline to use
 	renderPass.setPipeline(pipeline);
-	renderPass.setVertexBuffer(0, pointBuffer, 0, pointBuffer.getSize());
-	renderPass.setIndexBuffer(indexBuffer, wgpu::IndexFormat::Uint16, 0, indexBuffer.getSize());
+	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
+	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint16, 0, mesh.indexBuffer.getSize());
 
 	// Set binding group
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
-	renderPass.drawIndexed(indexCount, 1, 0, 0, 0);
+	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
 
 	renderPass.end();
 	renderPass.release();
@@ -746,6 +755,24 @@ void DrawWebGPU(ES::Engine::Core &core)
 	// At the end of the frame
 	targetView.release();
 	surface.present();
+}
+
+void ReleaseBuffers(ES::Engine::Core &core)
+{
+	// if (indexBuffer) {
+	// 	indexBuffer.release();
+	// 	indexBuffer = nullptr;
+	// }
+
+	// if (pointBuffer) {
+	// 	pointBuffer.release();
+	// 	pointBuffer = nullptr;
+	// }
+
+	// if (uniformBuffer) {
+	// 	uniformBuffer.release();
+	// 	uniformBuffer = nullptr;
+	// }
 }
 
 void ReleaseDevice(ES::Engine::Core &core)
@@ -821,6 +848,7 @@ class Plugin : public ES::Engine::APlugin {
 			DrawWebGPU
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
+			ReleaseBuffers,
 			ReleaseDevice,
 			ReleaseSurface,
 			ReleaseQueue,
@@ -916,15 +944,19 @@ auto main(int ac, char **av) -> int
 			auto &cameraData = core.GetResource<CameraData>();
 			auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 			glm::vec2 windowSize = window.GetSize();
-			
+
+			if (lastCursorPos.x == 0.0f && lastCursorPos.y == 0.0f) {
+				lastCursorPos = { static_cast<float>(x), static_cast<float>(y) };
+				return; // Skip the first call to avoid jump
+			}
+
 			glm::vec2 cursorOffset = { x - lastCursorPos.x, y - lastCursorPos.y };
 			lastCursorPos = { x, y };
-			
+
 			static float sensitivity = 0.003f;
 			cameraData.yaw += sensitivity * -cursorOffset.x;
 			cameraData.pitch += sensitivity * -cursorOffset.y;
 			cameraData.pitch = glm::clamp(cameraData.pitch, glm::radians(-89.0f), glm::radians(89.0f));
-			std::cout << "Yaw: " << cameraData.yaw << ", Pitch: " << cameraData.pitch << std::endl;
 		});
 	});
 
