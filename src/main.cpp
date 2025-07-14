@@ -274,12 +274,9 @@ struct Mesh {
 
 // TODO: Release them
 Mesh mesh;
-// wgpu::Buffer indexBuffer = nullptr;
-// wgpu::Buffer pointBuffer = nullptr;
 wgpu::Buffer uniformBuffer = nullptr;
 wgpu::PipelineLayout layout = nullptr;
 wgpu::BindGroupLayout bindGroupLayout = nullptr;
-// uint32_t indexCount = 0;
 wgpu::BindGroup bindGroup = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 wgpu::TextureView depthTextureView = nullptr;
@@ -623,23 +620,84 @@ wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
 	// Get the surface texture
 	wgpu::SurfaceTexture surfaceTexture(wgpu::Default);
 	surface.getCurrentTexture(&surfaceTexture);
-	if (surfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal) {
-		return nullptr;
+	if (
+	    surfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal && // NEW
+	    surfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal
+	) {
+	    return nullptr;
 	}
+	wgpu::Texture texture = surfaceTexture.texture;
 
 	// Create a view for this surface texture
 	wgpu::TextureViewDescriptor viewDescriptor(wgpu::Default);
 	viewDescriptor.label = wgpu::StringView("Surface texture view");
-	viewDescriptor.format = wgpu::Texture(surfaceTexture.texture).getFormat();
+	viewDescriptor.format = texture.getFormat();
 	viewDescriptor.dimension = wgpu::TextureViewDimension::_2D;
-	viewDescriptor.baseMipLevel = 0;
 	viewDescriptor.mipLevelCount = 1;
-	viewDescriptor.baseArrayLayer = 0;
 	viewDescriptor.arrayLayerCount = 1;
-	viewDescriptor.aspect = wgpu::TextureAspect::All;
-	wgpu::TextureView targetView = wgpu::Texture(surfaceTexture.texture).createView(viewDescriptor);
+	wgpu::TextureView targetView = texture.createView(viewDescriptor);
+
+	// texture.release();
 
 	return targetView;
+}
+
+wgpu::RenderPassEncoder renderPass = nullptr;
+wgpu::TextureView textureView = nullptr;
+
+struct ClearColor {
+	wgpu::Color value = { 0.05, 0.05, 0.05, 1.0 };
+};
+
+void Clear(ES::Engine::Core &core) {
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
+	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	const ClearColor &clearColor = core.GetResource<ClearColor>();
+
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw.");
+	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot draw.");
+
+	textureView = GetNextSurfaceViewData(surface);
+	if (textureView == nullptr) throw std::runtime_error("Could not get next surface texture view");
+
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	encoderDesc.label = wgpu::StringView("Clear command encoder");
+	auto encoder = device.createCommandEncoder(encoderDesc);
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("Clear render pass");
+
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Clear;
+	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+	renderPassColorAttachment.clearValue = clearColor.value;
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Clear;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+	depthStencilAttachment.depthClearValue = 1.0f;
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	renderPass = encoder.beginRenderPass(renderPassDesc);
+
+	if (renderPass == nullptr) throw std::runtime_error("Could not create render pass encoder");
+
+	renderPass.end();
+	renderPass.release();
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView("Clear command buffer");
+	auto command = encoder.finish(cmdBufferDescriptor);
+	encoder.release();
+	queue.submit(1, &command);
+	command.release();
 }
 
 void DrawWebGPU(ES::Engine::Core &core)
@@ -689,90 +747,83 @@ void DrawWebGPU(ES::Engine::Core &core)
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
 
-	auto targetView = GetNextSurfaceViewData(surface);
-	if (!targetView) return;
+	if (!textureView) return;
 
 	// Create a command encoder for the draw call
 	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
 	encoderDesc.label = wgpu::StringView("My command encoder");
 	auto encoder = device.createCommandEncoder(encoderDesc);
 
-	encoder.insertDebugMarker(wgpu::StringView("Do something"));
-	encoder.insertDebugMarker(wgpu::StringView("Do something else"));
-
 	// Create the render pass that clears the screen with our color
-	wgpu::RenderPassDescriptor renderPassDesc;
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("My render pass");
 
 	// The attachment part of the render pass descriptor describes the target texture of the pass
-	wgpu::RenderPassColorAttachment renderPassColorAttachment;
-	renderPassColorAttachment.view = targetView;
-	renderPassColorAttachment.resolveTarget = nullptr;
-	renderPassColorAttachment.loadOp = wgpu::LoadOp::Clear;
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
 	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
-	renderPassColorAttachment.clearValue = wgpu::Color{ .05, 0.05, 0.05, 1.0 };
-	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
 
 	renderPassDesc.colorAttachmentCount = 1;
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
-	renderPassDesc.depthStencilAttachment = nullptr;
-	renderPassDesc.timestampWrites = nullptr;
-	renderPassDesc.label = wgpu::StringView("My render pass");
+
 	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
 	depthStencilAttachment.view = depthTextureView;
 	depthStencilAttachment.depthClearValue = 1.0f;
-	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Clear;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
 	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
 	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
 
-	// Create the render pass and end it immediately (we only clear the screen but do not draw anything)
-	// wgpu::RenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
 	wgpu::RenderPassEncoder renderPass = encoder.beginRenderPass(renderPassDesc);
 
 		// Select which render pipeline to use
 	renderPass.setPipeline(pipeline);
+	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
+
 	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
 	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint16, 0, mesh.indexBuffer.getSize());
 
 	// Set binding group
-	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
 
 	renderPass.end();
-	renderPass.release();
+	// renderPass.release();
 
 	// Finally encode and submit the render pass
 	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
-	cmdBufferDescriptor.nextInChain = nullptr;
 	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
 	auto command = encoder.finish(cmdBufferDescriptor);
-	encoder.release();
+	// encoder.release();
 
 	// std::cout << "Submitting command..." << std::endl;
 	queue.submit(1, &command);
-	command.release();
+	// command.release();
 	// std::cout << "Command submitted." << std::endl;
 
 	// At the end of the frame
-	targetView.release();
+	// targetView.release();
+	textureView.release();
 	surface.present();
 }
 
 void ReleaseBuffers(ES::Engine::Core &core)
 {
-	// if (indexBuffer) {
-	// 	indexBuffer.release();
-	// 	indexBuffer = nullptr;
-	// }
+	if (mesh.indexBuffer) {
+		mesh.indexBuffer.release();
+		mesh.indexBuffer = nullptr;
+	}
 
-	// if (pointBuffer) {
-	// 	pointBuffer.release();
-	// 	pointBuffer = nullptr;
-	// }
+	if (mesh.pointBuffer) {
+		mesh.pointBuffer.release();
+		mesh.pointBuffer = nullptr;
+	}
 
-	// if (uniformBuffer) {
-	// 	uniformBuffer.release();
-	// 	uniformBuffer = nullptr;
-	// }
+	if (uniformBuffer) {
+		uniformBuffer.release();
+		uniformBuffer = nullptr;
+	}
 }
 
 void ReleaseDevice(ES::Engine::Core &core)
@@ -825,6 +876,8 @@ class Plugin : public ES::Engine::APlugin {
     void Bind() final {
 		RequirePlugins<ES::Plugin::Window::Plugin>();
 
+		RegisterResource<ClearColor>(ClearColor());
+
 		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
 			CreateInstance,
 			CreateSurface,
@@ -845,6 +898,7 @@ class Plugin : public ES::Engine::APlugin {
 			CreateBindingGroup
 		);
 		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
+			Clear,
 			DrawWebGPU
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
@@ -916,6 +970,17 @@ auto main(int ac, char **av) -> int
 	core.RegisterSystem(MovementSystem);
 	core.RegisterSystem([](ES::Engine::Core &core) {
 		auto &cameraData = core.GetResource<CameraData>();
+	});
+
+	core.RegisterSystem([](ES::Engine::Core &core) {
+		auto &clearColor = core.GetResource<ClearColor>();
+		auto dt = core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
+		static float time = 0.0f;
+		time += dt;
+
+		clearColor.value.r = 0.5f + 0.5f * std::sin(time * 0.5f);
+		clearColor.value.g = 0.5f + 0.5f * std::sin(time * 0.7f);
+		clearColor.value.b = 0.5f + 0.5f * std::sin(time * 0.9f);
 	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
