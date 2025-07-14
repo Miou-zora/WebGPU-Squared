@@ -274,10 +274,12 @@ struct Mesh {
 	void Release() {
 		if (pointBuffer) {
 			pointBuffer.destroy();
+			pointBuffer.release();
 			pointBuffer = nullptr;
 		}
 		if (indexBuffer) {
 			indexBuffer.destroy();
+			indexBuffer.release();
 			indexBuffer = nullptr;
 		}
 		indexCount = 0;
@@ -288,7 +290,6 @@ struct Mesh {
 wgpu::Buffer uniformBuffer = nullptr;
 wgpu::PipelineLayout layout = nullptr;
 wgpu::BindGroupLayout bindGroupLayout = nullptr;
-wgpu::BindGroup bindGroup = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 wgpu::TextureView depthTextureView = nullptr;
 
@@ -612,7 +613,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	bindGroupDesc.entryCount = 1;
 	bindGroupDesc.entries = &binding;
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");
-	bindGroup = device.createBindGroup(bindGroupDesc);
+	const auto &bindGroup = core.RegisterResource(wgpu::BindGroup(device.createBindGroup(bindGroupDesc)));
 
 	if (bindGroup == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
 }
@@ -749,6 +750,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 
 	// Select which render pipeline to use
 	renderPass.setPipeline(pipeline);
+	auto &bindGroup = core.GetResource<wgpu::BindGroup>();
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
 	auto ent = core.GetRegistry().view<Mesh>().front();
@@ -835,11 +837,6 @@ void ReleaseBuffers(ES::Engine::Core &core)
 	core.GetRegistry().view<Mesh>().each([](Mesh &mesh) {
 		mesh.Release();
 	});
-
-	if (uniformBuffer) {
-		uniformBuffer.release();
-		uniformBuffer = nullptr;
-	}
 }
 
 void ReleaseDevice(ES::Engine::Core &core)
@@ -883,6 +880,24 @@ void ReleasePipeline(ES::Engine::Core &core)
 	}
 }
 
+void ReleaseBindingGroup(ES::Engine::Core &core)
+{
+	wgpu::BindGroup &bindGroup = core.GetResource<wgpu::BindGroup>();
+
+	if (bindGroup) {
+		bindGroup.release();
+		bindGroup = nullptr;
+	}
+}
+
+void ReleaseUniforms(ES::Engine::Core &core)
+{
+	if (uniformBuffer) {
+		uniformBuffer.release();
+		uniformBuffer = nullptr;
+	}
+}
+
 namespace ES::Plugin::WebGPU {
 class Plugin : public ES::Engine::APlugin {
   public:
@@ -918,11 +933,13 @@ class Plugin : public ES::Engine::APlugin {
 			DrawMeshes
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
+			ReleaseBindingGroup,
+			ReleaseUniforms,
 			ReleaseBuffers,
+			ReleasePipeline,
 			ReleaseDevice,
 			ReleaseSurface,
-			ReleaseQueue,
-			ReleasePipeline
+			ReleaseQueue
 		);
 	}
 };
