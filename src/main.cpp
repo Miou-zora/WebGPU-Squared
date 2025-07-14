@@ -270,10 +270,21 @@ struct Mesh {
 
 		queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
 	}
+
+	void Release() {
+		if (pointBuffer) {
+			pointBuffer.destroy();
+			pointBuffer = nullptr;
+		}
+		if (indexBuffer) {
+			indexBuffer.destroy();
+			indexBuffer = nullptr;
+		}
+		indexCount = 0;
+	}
 };
 
 // TODO: Release them
-Mesh mesh;
 wgpu::Buffer uniformBuffer = nullptr;
 wgpu::PipelineLayout layout = nullptr;
 wgpu::BindGroupLayout bindGroupLayout = nullptr;
@@ -288,16 +299,6 @@ void InitializeBuffers(ES::Engine::Core &core)
 
 	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot initialize buffers.");
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize buffers.");
-
-	std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec2> texCoords;
-    std::vector<uint32_t> indices;
-
-    bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
-	if (!success) throw std::runtime_error("Model cant be loaded");
-
-	mesh = Mesh(core, vertices, normals, indices);
 
 	wgpu::BufferDescriptor bufferDesc(wgpu::Default);
 	bufferDesc.size = sizeof(MyUniforms);
@@ -616,6 +617,8 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	if (bindGroup == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
 }
 
+wgpu::Texture textureToRelease = nullptr;
+
 wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
 	// Get the surface texture
 	wgpu::SurfaceTexture surfaceTexture(wgpu::Default);
@@ -637,7 +640,7 @@ wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
 	viewDescriptor.arrayLayerCount = 1;
 	wgpu::TextureView targetView = texture.createView(viewDescriptor);
 
-	// texture.release();
+	textureToRelease = texture;
 
 	return targetView;
 }
@@ -700,7 +703,77 @@ void Clear(ES::Engine::Core &core) {
 	command.release();
 }
 
-void DrawWebGPU(ES::Engine::Core &core)
+void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	if (renderPass == nullptr) throw std::runtime_error("Render pass encoder is not created, cannot draw mesh.");
+	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw mesh.");
+
+	const auto &transformMatrix = transform.getTransformationMatrix();
+
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
+
+
+	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	encoderDesc.label = wgpu::StringView("My command encoder");
+	auto commandEncoder = device.createCommandEncoder(encoderDesc);
+	if (commandEncoder == nullptr) throw std::runtime_error("Command encoder is not created, cannot draw mesh.");
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("Mesh render pass");
+
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
+	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthClearValue = 1.0f;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+	// Select which render pipeline to use
+	renderPass.setPipeline(pipeline);
+	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
+
+	auto ent = core.GetRegistry().view<Mesh>().front();
+
+	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
+	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint16, 0, mesh.indexBuffer.getSize());
+
+	// Set binding group
+	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+
+	renderPass.end();
+	renderPass.release();
+
+	// Finally encode and submit the render pass
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
+	auto command = commandEncoder.finish(cmdBufferDescriptor);
+	commandEncoder.release();
+
+	// std::cout << "Submitting command..." << std::endl;
+	queue.submit(1, &command);
+	command.release();
+}
+
+void DrawMeshes(ES::Engine::Core &core)
 {
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
@@ -747,78 +820,21 @@ void DrawWebGPU(ES::Engine::Core &core)
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
 
-	if (!textureView) return;
 
-	// Create a command encoder for the draw call
-	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
-	encoderDesc.label = wgpu::StringView("My command encoder");
-	auto encoder = device.createCommandEncoder(encoderDesc);
-
-	// Create the render pass that clears the screen with our color
-	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
-	renderPassDesc.label = wgpu::StringView("My render pass");
-
-	// The attachment part of the render pass descriptor describes the target texture of the pass
-	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
-	renderPassColorAttachment.view = textureView;
-	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
-	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
-	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
-
-	renderPassDesc.colorAttachmentCount = 1;
-	renderPassDesc.colorAttachments = &renderPassColorAttachment;
-
-	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-	depthStencilAttachment.view = depthTextureView;
-	depthStencilAttachment.depthClearValue = 1.0f;
-	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
-	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
-
-	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
-
-	wgpu::RenderPassEncoder renderPass = encoder.beginRenderPass(renderPassDesc);
-
-		// Select which render pipeline to use
-	renderPass.setPipeline(pipeline);
-	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
-
-	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
-	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint16, 0, mesh.indexBuffer.getSize());
-
-	// Set binding group
-	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
-
-	renderPass.end();
-	// renderPass.release();
-
-	// Finally encode and submit the render pass
-	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
-	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
-	auto command = encoder.finish(cmdBufferDescriptor);
-	// encoder.release();
-
-	// std::cout << "Submitting command..." << std::endl;
-	queue.submit(1, &command);
-	// command.release();
-	// std::cout << "Command submitted." << std::endl;
+	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+		DrawMesh(core, mesh, transform);
+	});
 
 	// At the end of the frame
-	// targetView.release();
 	textureView.release();
 	surface.present();
 }
 
 void ReleaseBuffers(ES::Engine::Core &core)
 {
-	if (mesh.indexBuffer) {
-		mesh.indexBuffer.release();
-		mesh.indexBuffer = nullptr;
-	}
-
-	if (mesh.pointBuffer) {
-		mesh.pointBuffer.release();
-		mesh.pointBuffer = nullptr;
-	}
+	core.GetRegistry().view<Mesh>().each([](Mesh &mesh) {
+		mesh.Release();
+	});
 
 	if (uniformBuffer) {
 		uniformBuffer.release();
@@ -899,7 +915,7 @@ class Plugin : public ES::Engine::APlugin {
 		);
 		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
 			Clear,
-			DrawWebGPU
+			DrawMeshes
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
 			ReleaseBuffers,
@@ -988,8 +1004,6 @@ auto main(int ac, char **av) -> int
 		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 		glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-
-
 		auto &inputManager = core.GetResource<ES::Plugin::Input::Resource::InputManager>();
 
 		inputManager.RegisterScrollCallback([&](ES::Engine::Core &, double, double y) {
@@ -1023,6 +1037,49 @@ auto main(int ac, char **av) -> int
 			cameraData.pitch += sensitivity * -cursorOffset.y;
 			cameraData.pitch = glm::clamp(cameraData.pitch, glm::radians(-89.0f), glm::radians(89.0f));
 		});
+	},
+	[&](ES::Engine::Core &core) {
+		auto entity = ES::Engine::Entity(core.CreateEntity());
+
+		std::vector<glm::vec3> vertices;
+		std::vector<glm::vec3> normals;
+		std::vector<glm::vec2> texCoords;
+		std::vector<uint32_t> indices;
+
+		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
+		if (!success) throw std::runtime_error("Model cant be loaded");
+
+		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
+		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 15.0f));
+	},
+	[&](ES::Engine::Core &core) {
+		auto entity = ES::Engine::Entity(core.CreateEntity());
+
+		std::vector<glm::vec3> vertices;
+		std::vector<glm::vec3> normals;
+		std::vector<glm::vec2> texCoords;
+		std::vector<uint32_t> indices;
+
+		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/jump.obj", vertices, normals, texCoords, indices);
+		if (!success) throw std::runtime_error("Model cant be loaded");
+
+		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
+		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
+	});
+
+	// print fps
+	core.RegisterSystem([&](ES::Engine::Core &core) {
+		auto dt = core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
+		static float time = 0.0f;
+		static int frames = 0;
+		time += dt;
+		frames++;
+
+		if (time >= 1.0f) {
+			std::cout << "FPS: " << frames << std::endl;
+			time = 0.0f;
+			frames = 0;
+		}
 	});
 
 	core.RunCore();
