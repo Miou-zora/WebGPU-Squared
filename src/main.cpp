@@ -406,10 +406,13 @@ void InitializePipeline(ES::Engine::Core &core)
 	pipelineDesc.label = wgpu::StringView("My Render Pipeline");
 	pipelineDesc.layout = layout;
 
+	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+	glm::ivec2 windowSize = window.GetSize();
+
 	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
 	depthTextureDesc.label = wgpu::StringView("Z Buffer");
 	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
-	depthTextureDesc.size = { 800, 800, 1 };
+	depthTextureDesc.size = { static_cast<uint32_t>(windowSize.x), static_cast<uint32_t>(windowSize.y), 1u };
 	depthTextureDesc.format = depthTextureFormat;
 	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
@@ -564,13 +567,16 @@ void ConfigureSurface(ES::Engine::Core &core) {
 	const auto &device = core.GetResource<wgpu::Device>();
 	const auto &surface = core.GetResource<wgpu::Surface>();
 	const auto &capabilities = core.GetResource<wgpu::SurfaceCapabilities>();
+	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 
 	if (surface == nullptr) throw std::runtime_error("Surface is not created, cannot configure it.");
 	if (device == nullptr) throw std::runtime_error("Device is not created, cannot configure surface.");
 
+	glm::ivec2 windowSize = window.GetSize();
+
 	wgpu::SurfaceConfiguration config(wgpu::Default);
-	config.width = 800;
-	config.height = 800;
+	config.width = windowSize.x;
+	config.height = windowSize.y;
 	config.usage = wgpu::TextureUsage::RenderAttachment;
 	config.format = capabilities.formats[0];
 	config.viewFormatCount = 0;
@@ -579,7 +585,7 @@ void ConfigureSurface(ES::Engine::Core &core) {
 	config.presentMode = wgpu::PresentMode::Fifo;
 	config.alphaMode = wgpu::CompositeAlphaMode::Auto;
 
-	wgpuSurfaceConfigure(surface, &config);
+	surface.configure(config);
 }
 
 void ReleaseAdapter(ES::Engine::Core &core)
@@ -898,6 +904,39 @@ void ReleaseUniforms(ES::Engine::Core &core)
 	}
 }
 
+
+void terminateDepthBuffer(ES::Engine::Core &core) {
+	if (depthTextureView) {
+		depthTextureView.release();
+		depthTextureView = nullptr;
+	}
+}
+
+void initDepthBuffer(ES::Engine::Core &core) {
+	auto &device = core.GetResource<wgpu::Device>();
+	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize depth buffer.");
+
+	glm::ivec2 windowSize = window.GetSize();
+
+	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
+	depthTextureDesc.label = wgpu::StringView("Z Buffer");
+	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
+	depthTextureDesc.size = { static_cast<uint32_t>(windowSize.x), static_cast<uint32_t>(windowSize.y), 1u };
+	depthTextureDesc.format = depthTextureFormat;
+	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
+
+	depthTextureView = depthTexture.createView();
+	depthTexture.release();
+}
+
+void unconfigureSurface(ES::Engine::Core &core) {
+	auto &surface = core.GetResource<wgpu::Surface>();
+	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot unconfigure it.");
+
+	surface.unconfigure();
+}
+
 namespace ES::Plugin::WebGPU {
 class Plugin : public ES::Engine::APlugin {
   public:
@@ -937,6 +976,7 @@ class Plugin : public ES::Engine::APlugin {
 			ReleaseUniforms,
 			ReleaseBuffers,
 			ReleasePipeline,
+			terminateDepthBuffer,
 			ReleaseDevice,
 			ReleaseSurface,
 			ReleaseQueue
@@ -983,6 +1023,22 @@ void MovementSystem(ES::Engine::Core &core)
 
 glm::vec2 lastCursorPos(0.0f, 0.0f);
 
+void onResize(GLFWwindow* window, int width, int height) {
+	auto core = reinterpret_cast<ES::Engine::Core*>(glfwGetWindowUserPointer(window));
+
+    // Call the actual class-member callback
+    if (core == nullptr) throw std::runtime_error("Window user pointer is null, cannot resize.");
+
+	terminateDepthBuffer(*core);
+	unconfigureSurface(*core);
+
+	ConfigureSurface(*core);
+	initDepthBuffer(*core);
+
+	auto &cameraData = core->GetResource<CameraData>();
+	cameraData.aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+}
+
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
@@ -1017,10 +1073,12 @@ auto main(int ac, char **av) -> int
 	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
-		// lock cursor position to the center of the window
-		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-		glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		glfwSetWindowAttrib(core.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), GLFW_RESIZABLE, GLFW_TRUE);
+		core.GetResource<ES::Plugin::Window::Resource::Window>().SetFramebufferSizeCallback(&core, onResize);
+	});
 
+	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
+		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 		auto &inputManager = core.GetResource<ES::Plugin::Input::Resource::InputManager>();
 
 		inputManager.RegisterScrollCallback([&](ES::Engine::Core &, double, double y) {
