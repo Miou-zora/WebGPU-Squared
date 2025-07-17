@@ -53,6 +53,9 @@ struct DragState {
     // Constant settings
     float sensitivity = 0.01f;
     float scrollSensitivity = 0.1f;
+	glm::vec2 velocity = {0.0, 0.0};
+    glm::vec2 previousDelta = {0.0, 0.0};
+    float inertia = 0.9f;
 };
 
 uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
@@ -1040,7 +1043,6 @@ glm::vec2 lastCursorPos(0.0f, 0.0f);
 void onResize(GLFWwindow* window, int width, int height) {
 	auto core = reinterpret_cast<ES::Engine::Core*>(glfwGetWindowUserPointer(window));
 
-    // Call the actual class-member callback
     if (core == nullptr) throw std::runtime_error("Window user pointer is null, cannot resize.");
 
 	terminateDepthBuffer(*core);
@@ -1059,6 +1061,7 @@ auto main(int ac, char **av) -> int
 
 	core.AddPlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin>();
 
+	// TODO: avoid defining the camera data in the main.cpp, use default values
 	core.RegisterResource<CameraData>({
 		.position = { 0.0f, 3.0f, 3.0f },
 		.yaw = 4.75f,
@@ -1075,7 +1078,7 @@ auto main(int ac, char **av) -> int
 		.startMouse = { 0.0f, 0.0f },
 		.originYaw = 0.0f,
 		.originPitch = 0.0f,
-		.sensitivity = 0.01f,
+		.sensitivity = 0.005f,
 		.scrollSensitivity = 0.1f
 	});
 
@@ -1090,6 +1093,26 @@ auto main(int ac, char **av) -> int
 		clearColor.value.r = 0.5f + 0.5f * std::sin(time * 0.5f);
 		clearColor.value.g = 0.5f + 0.5f * std::sin(time * 0.7f);
 		clearColor.value.b = 0.5f + 0.5f * std::sin(time * 0.9f);
+	});
+
+	core.RegisterSystem<ES::Engine::Scheduler::FixedTimeUpdate>([](ES::Engine::Core &core) {
+		auto &drag = core.GetResource<DragState>();
+		auto &cameraState = core.GetResource<CameraData>();
+
+		constexpr float eps = 1e-4f;
+		// Apply inertia only when the user released the click.
+		if (!drag.active) {
+			// Avoid updating the matrix when the velocity is no longer noticeable
+			if (std::abs(drag.velocity.x) < eps && std::abs(drag.velocity.y) < eps) {
+				return;
+			}
+			cameraState.pitch += drag.velocity.y * drag.sensitivity;
+			cameraState.yaw += drag.velocity.x * drag.sensitivity;
+			cameraState.pitch = glm::clamp(cameraState.pitch, -glm::half_pi<float>() + 1e-5f, glm::half_pi<float>() - 1e-5f);
+			// Dampen the velocity so that it decreases exponentially and stops
+			// after a few frames.
+			drag.velocity *= drag.inertia;
+		}
 	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
@@ -1114,23 +1137,39 @@ auto main(int ac, char **av) -> int
 			}
 		});
 
+		inputManager.RegisterMouseButtonCallback([&](ES::Engine::Core &cbCore, int button, int action, int) {
+			auto &cameraData = cbCore.GetResource<CameraData>();
+			auto &drag = cbCore.GetResource<DragState>();
+			auto &window = cbCore.GetResource<ES::Plugin::Window::Resource::Window>();
+			glm::vec2 mousePos = window.GetMousePosition();
+			if (button == GLFW_MOUSE_BUTTON_LEFT) {
+				switch(action) {
+				case GLFW_PRESS:
+					drag.active = true;
+					drag.startMouse = glm::vec2(-mousePos.x, -window.GetSize().y+mousePos.y);
+					drag.originYaw = cameraData.yaw;
+					drag.originPitch = cameraData.pitch;
+					break;
+				case GLFW_RELEASE:
+					drag.active = false;
+					break;
+				}
+			}
+		});
+
 		inputManager.RegisterCursorPosCallback([&](ES::Engine::Core &, double x, double y) {
 			auto &cameraData = core.GetResource<CameraData>();
-			auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-			glm::vec2 windowSize = window.GetSize();
+			auto &drag = core.GetResource<DragState>();
 
-			if (lastCursorPos.x == 0.0f && lastCursorPos.y == 0.0f) {
-				lastCursorPos = { static_cast<float>(x), static_cast<float>(y) };
-				return; // Skip the first call to avoid jump
+			if (drag.active) {
+				glm::vec2 currentMouse = glm::vec2(-(float)x, -(float)y);
+				glm::vec2 delta = (currentMouse - drag.startMouse) * drag.sensitivity;
+				cameraData.yaw = drag.originYaw + delta.x;
+				cameraData.pitch = drag.originPitch + delta.y;
+				cameraData.pitch = glm::clamp(cameraData.pitch, -glm::half_pi<float>() + 1e-5f, glm::half_pi<float>() - 1e-5f);
+				drag.velocity = delta - drag.previousDelta;
+        		drag.previousDelta = delta;
 			}
-
-			glm::vec2 cursorOffset = { x - lastCursorPos.x, y - lastCursorPos.y };
-			lastCursorPos = { x, y };
-
-			static float sensitivity = 0.003f;
-			cameraData.yaw += sensitivity * -cursorOffset.x;
-			cameraData.pitch += sensitivity * -cursorOffset.y;
-			cameraData.pitch = glm::clamp(cameraData.pitch, glm::radians(-89.0f), glm::radians(89.0f));
 		});
 	},
 	[&](ES::Engine::Core &core) {
@@ -1162,7 +1201,6 @@ auto main(int ac, char **av) -> int
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 	});
 
-	// print fps
 	core.RegisterSystem([&](ES::Engine::Core &core) {
 		auto dt = core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
 		static float time = 0.0f;
