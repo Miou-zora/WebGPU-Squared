@@ -27,6 +27,9 @@ struct MyUniforms {
     float _pad[3];
 };
 
+// This assert should stay here as we want this rule to link struct to webgpu struct
+static_assert(sizeof(MyUniforms) % 16 == 0);
+
 struct CameraData {
 	glm::vec3 position;
 	float yaw; // Yaw angle in radians
@@ -38,8 +41,19 @@ struct CameraData {
 	float aspectRatio;
 };
 
-// This assert should stay here as we want this rule to link struct to webgpu struct
-static_assert(sizeof(MyUniforms) % 16 == 0);
+struct DragState {
+    // Whether a drag action is ongoing (i.e., we are between mouse press and mouse release)
+    bool active = false;
+    // The position of the mouse at the beginning of the drag action
+    glm::vec2 startMouse;
+    // The camera state at the beginning of the drag action
+    float originYaw = 0.0f;
+    float originPitch = 0.0f;
+
+    // Constant settings
+    float sensitivity = 0.01f;
+    float scrollSensitivity = 0.1f;
+};
 
 uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
     uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
@@ -1056,10 +1070,16 @@ auto main(int ac, char **av) -> int
 		.aspectRatio = 800.0f / 800.0f
 	});
 
-	core.RegisterSystem(MovementSystem);
-	core.RegisterSystem([](ES::Engine::Core &core) {
-		auto &cameraData = core.GetResource<CameraData>();
+	core.RegisterResource<DragState>({
+    	.active = false,
+		.startMouse = { 0.0f, 0.0f },
+		.originYaw = 0.0f,
+		.originPitch = 0.0f,
+		.sensitivity = 0.01f,
+		.scrollSensitivity = 0.1f
 	});
+
+	core.RegisterSystem(MovementSystem);
 
 	core.RegisterSystem([](ES::Engine::Core &core) {
 		auto &clearColor = core.GetResource<ClearColor>();
@@ -1073,7 +1093,7 @@ auto main(int ac, char **av) -> int
 	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
-		glfwSetWindowAttrib(core.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), GLFW_RESIZABLE, GLFW_TRUE);
+		core.GetResource<ES::Plugin::Window::Resource::Window>().SetResizable(true);
 		core.GetResource<ES::Plugin::Window::Resource::Window>().SetFramebufferSizeCallback(&core, onResize);
 	});
 
