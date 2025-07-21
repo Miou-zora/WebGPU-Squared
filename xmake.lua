@@ -96,7 +96,8 @@ add_requires("wgpu-native ^24.0.0", {configs = {shared = true}})
 -- add_requires("glfw ^3.4", { configs = {shared = true} })
 -- add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = true} })
 add_requires("spdlog", "entt", "fmt", "glm")
-add_requires("glfw3webgpuq v1.3.0-alpha", {configs = {shared = true} })
+add_requires("glfw3webgpuq v1.3.0-alpha", {configs = {shared = true}, debug = true})
+add_requires("imgui v1.92.0-docking", {configs = {shared = true }})
 
 includes("../../EngineSquared/xmake.lua")
 
@@ -109,9 +110,11 @@ target(project_name)
     set_default(true)
     add_packages("wgpu-native")
     add_packages("spdlog", "entt", "fmt", "glm")
+    add_packages("imgui")
 
     add_deps("EngineSquared")
     add_packages("glfw3webgpuq")
+    add_defines("IMGUI_IMPL_WEBGPU_BACKEND_WGPU")
 
     add_files("src/**.cpp")
     add_headerfiles("src/**.hpp", { public = true })

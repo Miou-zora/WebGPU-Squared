@@ -18,6 +18,11 @@
 #include <GLFW/glfw3.h>
 #include "RenderingPipeline.hpp"
 
+#include <imgui.h>
+#include "imgui_impl_wgpu.h"
+#include "imgui_impl_glfw.h"
+
+
 struct MyUniforms {
 	glm::mat4x4 projectionMatrix;
     glm::mat4x4 viewMatrix;
@@ -148,6 +153,47 @@ void AdaptaterPrintFeatures(ES::Engine::Core &core)
 	features.freeMembers();
 }
 
+void UpdateGui(wgpu::RenderPassEncoder renderPass) {
+    // Start the Dear ImGui frame
+    ImGui_ImplWGPU_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+	// Build our UI
+	static float f = 0.0f;
+	static int counter = 0;
+	static bool show_demo_window = true;
+	static bool show_another_window = false;
+	static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+	ImGui::Begin("Hello, world!");                                // Create a window called "Hello, world!" and append into it.
+
+	ImGui::Text("This is some useful text.");                     // Display some text (you can use a format strings too)
+	ImGui::Checkbox("Demo Window", &show_demo_window);            // Edit bools storing our window open/close state
+	ImGui::Checkbox("Another Window", &show_another_window);
+
+	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);                  // Edit 1 float using a slider from 0.0f to 1.0f
+	ImGui::ColorEdit3("clear color", (float*)&clear_color);       // Edit 3 floats representing a color
+
+	if (ImGui::Button("Button"))                                  // Buttons return true when clicked (most widgets return true when edited/activated)
+		counter++;
+	ImGui::SameLine();
+	ImGui::Text("counter = %d", counter);
+
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+	ImGui::End();
+
+	ImGui::ShowDemoWindow();
+
+    // Draw the UI
+    ImGui::EndFrame();
+    // Convert the UI defined above into low-level drawing commands
+    ImGui::Render();
+    // Execute the low-level drawing commands on the WebGPU backend
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
+}
+
 void AdaptaterPrintProperties(ES::Engine::Core &core)
 {
 	const auto &adapter = core.GetResource<wgpu::Adapter>();
@@ -224,6 +270,7 @@ void InspectDevice(ES::Engine::Core &core) {
 
     wgpu::Limits limits(wgpu::Default);
     limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
+	limits.maxBindGroups = 2;
 
     bool success = device.getLimits(&limits) == wgpu::Status::Success;
 
@@ -424,12 +471,14 @@ void InitializePipeline(ES::Engine::Core &core)
 	pipelineDesc.layout = layout;
 
 	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-	glm::ivec2 windowSize = window.GetSize();
+
+	int frameBufferSizeX, frameBufferSizeY;
+	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 
 	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
 	depthTextureDesc.label = wgpu::StringView("Z Buffer");
 	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
-	depthTextureDesc.size = { static_cast<uint32_t>(windowSize.x), static_cast<uint32_t>(windowSize.y), 1u };
+	depthTextureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1u };
 	depthTextureDesc.format = depthTextureFormat;
 	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
@@ -589,11 +638,11 @@ void ConfigureSurface(ES::Engine::Core &core) {
 	if (surface == nullptr) throw std::runtime_error("Surface is not created, cannot configure it.");
 	if (device == nullptr) throw std::runtime_error("Device is not created, cannot configure surface.");
 
-	glm::ivec2 windowSize = window.GetSize();
-
+	int frameBufferSizeX, frameBufferSizeY;
+	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 	wgpu::SurfaceConfiguration config(wgpu::Default);
-	config.width = windowSize.x;
-	config.height = windowSize.y;
+	config.width = frameBufferSizeX;
+	config.height = frameBufferSizeY;
 	config.usage = wgpu::TextureUsage::RenderAttachment;
 	config.format = capabilities.formats[0];
 	config.viewFormatCount = 0;
@@ -784,6 +833,8 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	// Set binding group
 	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
 
+	UpdateGui(renderPass);
+
 	renderPass.end();
 	renderPass.release();
 
@@ -934,12 +985,13 @@ void initDepthBuffer(ES::Engine::Core &core) {
 	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize depth buffer.");
 
-	glm::ivec2 windowSize = window.GetSize();
+	int frameBufferSizeX, frameBufferSizeY;
+	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 
 	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
 	depthTextureDesc.label = wgpu::StringView("Z Buffer");
 	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
-	depthTextureDesc.size = { static_cast<uint32_t>(windowSize.x), static_cast<uint32_t>(windowSize.y), 1u };
+	depthTextureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1u };
 	depthTextureDesc.format = depthTextureFormat;
 	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
@@ -1061,6 +1113,25 @@ auto main(int ac, char **av) -> int
 
 	core.AddPlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin>();
 
+	core.RegisterSystem<ES::Plugin::RenderingPipeline::Setup>([](ES::Engine::Core &core) {
+		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO();
+
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		// Setup Platform/Renderer backends
+		ImGui_ImplGlfw_InitForOther(window.GetGLFWWindow(), true);
+		ImGui_ImplWGPU_InitInfo info = ImGui_ImplWGPU_InitInfo();
+		info.DepthStencilFormat = depthTextureFormat;
+		info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
+		info.Device = core.GetResource<wgpu::Device>();
+		ImGui_ImplWGPU_Init(&info);
+	});
+
 	// TODO: avoid defining the camera data in the main.cpp, use default values
 	core.RegisterResource<CameraData>({
 		.position = { 0.0f, 3.0f, 3.0f },
@@ -1118,6 +1189,16 @@ auto main(int ac, char **av) -> int
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
 		core.GetResource<ES::Plugin::Window::Resource::Window>().SetResizable(true);
 		core.GetResource<ES::Plugin::Window::Resource::Window>().SetFramebufferSizeCallback(&core, onResize);
+		// Print pixel ratio
+		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+
+		int displayX, displayY;
+		glfwGetFramebufferSize(window.GetGLFWWindow(), &displayX, &displayY);
+		int windowX, windowY;
+		glfwGetWindowSize(window.GetGLFWWindow(), &windowX, &windowY);
+		std::cout << "Display size: " << displayX << "x" << displayY << std::endl;
+		std::cout << "Window size: " << windowX << "x" << windowY << std::endl;
+		std::cout << "Pixel ratio: " << static_cast<float>(displayX) / static_cast<float>(windowX) << std::endl;
 	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
@@ -1135,9 +1216,21 @@ auto main(int ac, char **av) -> int
 			if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 				cbCore.Stop();
 			}
+
+			ImGuiIO& io = ImGui::GetIO();
+			if (io.WantCaptureMouse) {
+				// Don't rotate the camera if the mouse is already captured by an ImGui
+				// interaction at this frame.
+				return;
+			}
 		});
 
 		inputManager.RegisterMouseButtonCallback([&](ES::Engine::Core &cbCore, int button, int action, int) {
+			ImGuiIO& io = ImGui::GetIO();
+			if (io.WantCaptureMouse) {
+				ImGui_ImplGlfw_MouseButtonCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), button, action, 0);
+				return;
+			}
 			auto &cameraData = cbCore.GetResource<CameraData>();
 			auto &drag = cbCore.GetResource<DragState>();
 			auto &window = cbCore.GetResource<ES::Plugin::Window::Resource::Window>();
