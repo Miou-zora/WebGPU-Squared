@@ -76,13 +76,13 @@ struct Mesh {
 			indexData.push_back(indices.at(i));
 		}
 
-		indexCount = static_cast<uint32_t>(indexData.size());
+		indexCount = indexData.size();
 
 		wgpu::BufferDescriptor bufferDesc(wgpu::Default);
 		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
 		bufferDesc.mappedAtCreation = false;
 		bufferDesc.size = pointData.size() * sizeof(float);
-		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex; // Vertex usage here!
+		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
 		pointBuffer = device.createBuffer(bufferDesc);
 
 		queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
@@ -1204,8 +1204,8 @@ auto main(int ac, char **av) -> int
 		.pitch = -0.75f,
 		.up = { 0.0f, 1.0f, 0.0f },
 		.fovY = glm::radians(45.0f),
-		.nearPlane = 0.001f,
-		.farPlane = 1000.0f,
+		.nearPlane = 10.f,
+		.farPlane = 10000.0f,
 		.aspectRatio = 800.0f / 800.0f
 	});
 

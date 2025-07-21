@@ -32,5 +32,5 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return vec4f(in.normal, 1.0) * uMyUniform.color;
+    return vec4f(in.normal, 1.0);
 }
