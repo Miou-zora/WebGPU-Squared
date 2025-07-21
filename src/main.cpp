@@ -46,6 +46,71 @@ struct CameraData {
 	float aspectRatio;
 };
 
+
+struct Mesh {
+	wgpu::Buffer pointBuffer = nullptr;
+	wgpu::Buffer indexBuffer = nullptr;
+	uint32_t indexCount = 0;
+
+	bool enabled = true;
+
+	Mesh() = default;
+
+	Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const std::vector<glm::vec3> &normals, const std::vector<uint32_t> &indices) {
+		auto &device = core.GetResource<wgpu::Device>();
+		auto &queue = core.GetResource<wgpu::Queue>();
+
+		std::vector<float> pointData;
+		for (size_t i = 0; i < vertices.size(); i++) {
+			pointData.push_back(vertices.at(i).x);
+			pointData.push_back(vertices.at(i).y);
+			pointData.push_back(vertices.at(i).z);
+			pointData.push_back(normals.at(i).r);
+			pointData.push_back(normals.at(i).g);
+			pointData.push_back(normals.at(i).b);
+		}
+
+
+		std::vector<uint32_t> indexData;
+		for (size_t i = 0; i < indices.size(); i++) {
+			indexData.push_back(indices.at(i));
+		}
+
+		indexCount = static_cast<uint32_t>(indexData.size());
+
+		wgpu::BufferDescriptor bufferDesc(wgpu::Default);
+		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
+		bufferDesc.mappedAtCreation = false;
+		bufferDesc.size = pointData.size() * sizeof(float);
+		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex; // Vertex usage here!
+		pointBuffer = device.createBuffer(bufferDesc);
+
+		queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
+
+		bufferDesc.size = indexData.size() * sizeof(uint32_t);
+		bufferDesc.size = (bufferDesc.size + 3) & ~3;
+		indexData.resize((indexData.size() + 1) & ~1);
+		bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
+		indexBuffer = device.createBuffer(bufferDesc);
+
+		queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
+	}
+
+	void Release() {
+		if (pointBuffer) {
+			pointBuffer.destroy();
+			pointBuffer.release();
+			pointBuffer = nullptr;
+		}
+		if (indexBuffer) {
+			indexBuffer.destroy();
+			indexBuffer.release();
+			indexBuffer = nullptr;
+		}
+		indexCount = 0;
+	}
+};
+
 struct DragState {
     // Whether a drag action is ongoing (i.e., we are between mouse press and mouse release)
     bool active = false;
@@ -65,6 +130,10 @@ struct DragState {
 
 struct ClearColor {
 	wgpu::Color value = { 0.05, 0.05, 0.05, 1.0 };
+};
+
+struct Name {
+	std::string value;
 };
 
 uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
@@ -180,6 +249,10 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	ImGuiIO& io = ImGui::GetIO();
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
+	core.GetRegistry().view<Mesh, Name>().each([&](Mesh &mesh, Name &name) {
+		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
+	});
+
 	ImGui::End();
 
     // Draw the UI
@@ -282,68 +355,6 @@ void InspectDevice(ES::Engine::Core &core) {
 	ES::Utils::Log::Info(fmt::format(" - maxTextureDimension3D: {}", limits.maxTextureDimension3D));
 	ES::Utils::Log::Info(fmt::format(" - maxTextureArrayLayers: {}", limits.maxTextureArrayLayers));
 }
-
-struct Mesh {
-	wgpu::Buffer pointBuffer = nullptr;
-	wgpu::Buffer indexBuffer = nullptr;
-	uint32_t indexCount = 0;
-
-	Mesh() = default;
-
-	Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const std::vector<glm::vec3> &normals, const std::vector<uint32_t> &indices) {
-		auto &device = core.GetResource<wgpu::Device>();
-		auto &queue = core.GetResource<wgpu::Queue>();
-
-		std::vector<float> pointData;
-		for (size_t i = 0; i < vertices.size(); i++) {
-			pointData.push_back(vertices.at(i).x);
-			pointData.push_back(vertices.at(i).y);
-			pointData.push_back(vertices.at(i).z);
-			pointData.push_back(normals.at(i).r);
-			pointData.push_back(normals.at(i).g);
-			pointData.push_back(normals.at(i).b);
-		}
-
-
-		std::vector<uint16_t> indexData;
-		for (size_t i = 0; i < indices.size(); i++) {
-			indexData.push_back(static_cast<uint16_t>(indices.at(i)));
-		}
-
-		indexCount = static_cast<uint32_t>(indexData.size());
-
-		wgpu::BufferDescriptor bufferDesc(wgpu::Default);
-		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
-		bufferDesc.mappedAtCreation = false;
-		bufferDesc.size = pointData.size() * sizeof(float);
-		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex; // Vertex usage here!
-		pointBuffer = device.createBuffer(bufferDesc);
-
-		queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
-
-		bufferDesc.size = indexData.size() * sizeof(uint16_t);
-		indexData.resize((indexData.size() + 1) & ~1);
-		bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
-		indexBuffer = device.createBuffer(bufferDesc);
-
-		queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
-	}
-
-	void Release() {
-		if (pointBuffer) {
-			pointBuffer.destroy();
-			pointBuffer.release();
-			pointBuffer = nullptr;
-		}
-		if (indexBuffer) {
-			indexBuffer.destroy();
-			indexBuffer.release();
-			indexBuffer = nullptr;
-		}
-		indexCount = 0;
-	}
-};
-
 // TODO: Release them
 wgpu::Buffer uniformBuffer = nullptr;
 wgpu::PipelineLayout layout = nullptr;
@@ -771,7 +782,6 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 
-	if (renderPass == nullptr) throw std::runtime_error("Render pass encoder is not created, cannot draw mesh.");
 	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
 	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
 	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
@@ -815,13 +825,69 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	auto &bindGroup = core.GetResource<wgpu::BindGroup>();
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
-	auto ent = core.GetRegistry().view<Mesh>().front();
-
 	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
-	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint16, 0, mesh.indexBuffer.getSize());
+	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
 
 	// Set binding group
 	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+
+	renderPass.end();
+	renderPass.release();
+
+	// Finally encode and submit the render pass
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
+	auto command = commandEncoder.finish(cmdBufferDescriptor);
+	commandEncoder.release();
+
+	// std::cout << "Submitting command..." << std::endl;
+	queue.submit(1, &command);
+	command.release();
+}
+
+void DrawGui(ES::Engine::Core &core)
+{
+	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw mesh.");
+
+	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	encoderDesc.label = wgpu::StringView("My command encoder");
+	auto commandEncoder = device.createCommandEncoder(encoderDesc);
+	if (commandEncoder == nullptr) throw std::runtime_error("Command encoder is not created, cannot draw mesh.");
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("Mesh render pass");
+
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
+	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthClearValue = 1.0f;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+	// Select which render pipeline to use
+	renderPass.setPipeline(pipeline);
+	auto &bindGroup = core.GetResource<wgpu::BindGroup>();
+	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
 	UpdateGui(renderPass, core);
 
@@ -888,8 +954,11 @@ void DrawMeshes(ES::Engine::Core &core)
 
 
 	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+		if (!mesh.enabled) return;
 		DrawMesh(core, mesh, transform);
 	});
+
+	DrawGui(core);
 
 	// At the end of the frame
 	textureView.release();
@@ -1061,6 +1130,12 @@ static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
     if (inputManager.IsKeyPressed(GLFW_KEY_D)) {
         force.x += 1.0f;
     }
+	if (inputManager.IsKeyPressed(GLFW_KEY_SPACE)) {
+		force.y += 1.0f;
+	}
+	if (inputManager.IsKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
+		force.y -= 1.0f;
+	}
 
     if (glm::length(force) > 1.0f) {
         force = glm::normalize(force);
@@ -1075,7 +1150,7 @@ void MovementSystem(ES::Engine::Core &core)
 
 	glm::vec3 movementForce = GetKeyboardMovementForce(core);
 	if (glm::length(movementForce) > 0.0f) {
-		cameraData.position += movementForce * 0.04f;
+		cameraData.position += movementForce * 1.f;
 	}
 
 }
@@ -1124,13 +1199,13 @@ auto main(int ac, char **av) -> int
 
 	// TODO: avoid defining the camera data in the main.cpp, use default values
 	core.RegisterResource<CameraData>({
-		.position = { 0.0f, 3.0f, 3.0f },
+		.position = { 0.0f, 300.0f, 0.0f },
 		.yaw = 4.75f,
 		.pitch = -0.75f,
 		.up = { 0.0f, 1.0f, 0.0f },
 		.fovY = glm::radians(45.0f),
 		.nearPlane = 0.001f,
-		.farPlane = 100.0f,
+		.farPlane = 1000.0f,
 		.aspectRatio = 800.0f / 800.0f
 	});
 
@@ -1252,11 +1327,12 @@ auto main(int ac, char **av) -> int
 		std::vector<glm::vec2> texCoords;
 		std::vector<uint32_t> indices;
 
-		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
+		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/sponza.obj", vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Model cant be loaded");
 
 		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
-		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 15.0f));
+		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
+		entity.AddComponent<Name>(core, "Sponza");
 	},
 	[&](ES::Engine::Core &core) {
 		auto entity = ES::Engine::Entity(core.CreateEntity());
@@ -1266,11 +1342,12 @@ auto main(int ac, char **av) -> int
 		std::vector<glm::vec2> texCoords;
 		std::vector<uint32_t> indices;
 
-		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/jump.obj", vertices, normals, texCoords, indices);
+		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Model cant be loaded");
 
 		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
+		entity.AddComponent<Name>(core, "Finish");
 	});
 
 	core.RunCore();

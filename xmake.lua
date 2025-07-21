@@ -23,7 +23,7 @@ package("glfw3webgpuq")
         elseif package:is_plat("macosx", "iphoneos") then
             package:add("defines", "GLFW_EXPOSE_NATIVE_COCOA")
         end
-    
+
         if package:config("x11") then
             package:add("defines", "GLFW_EXPOSE_NATIVE_X11")
         elseif package:config("wayland") then
@@ -59,19 +59,19 @@ package("glfw3webgpuq")
                 set_kind("$(kind)")
                 set_languages("c11")
                 add_headerfiles("glfw3webgpu.h")
-                
+
                 add_mxflags("-fno-objc-arc")
-                
+
                 add_packages("wgpu-native")
                 add_packages("glfw")
-                
+
                 if is_plat("iphoneos", "macosx") then
                     add_frameworks("Metal", "Foundation", "QuartzCore")
                     add_files("glfw3webgpu.m")
                 else
                     add_files("glfw3webgpu.c")
                 end
-                
+
                 if is_plat("windows") and is_kind("shared") then
                     add_rules("utils.symbols.export_all")
                 end
