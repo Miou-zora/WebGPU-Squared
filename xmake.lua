@@ -3,8 +3,6 @@ package("glfw3webgpuq")
     set_homepage("https://github.com/eliemichel/glfw3webgpu")
     set_license("MIT")
 
-    add_defines("GLM_FORCE_DEPTH_ZERO_TO_ONE", "GLM_FORCE_LEFT_HANDED")
-
     add_urls("https://github.com/eliemichel/glfw3webgpu/archive/refs/tags/$(version).tar.gz",
              "https://github.com/eliemichel/glfw3webgpu.git")
 

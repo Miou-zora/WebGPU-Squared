@@ -63,6 +63,10 @@ struct DragState {
     float inertia = 0.9f;
 };
 
+struct ClearColor {
+	wgpu::Color value = { 0.05, 0.05, 0.05, 1.0 };
+};
+
 uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
     uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
     return step * divide_and_ceil;
@@ -153,44 +157,34 @@ void AdaptaterPrintFeatures(ES::Engine::Core &core)
 	features.freeMembers();
 }
 
-void UpdateGui(wgpu::RenderPassEncoder renderPass) {
+void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
     // Start the Dear ImGui frame
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+	auto &clearColor = core.GetResource<ClearColor>();
 
 	// Build our UI
 	static float f = 0.0f;
 	static int counter = 0;
 	static bool show_demo_window = true;
 	static bool show_another_window = false;
-	static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-	ImGui::Begin("Hello, world!");                                // Create a window called "Hello, world!" and append into it.
+	ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!"
 
-	ImGui::Text("This is some useful text.");                     // Display some text (you can use a format strings too)
-	ImGui::Checkbox("Demo Window", &show_demo_window);            // Edit bools storing our window open/close state
-	ImGui::Checkbox("Another Window", &show_another_window);
-
-	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);                  // Edit 1 float using a slider from 0.0f to 1.0f
-	ImGui::ColorEdit3("clear color", (float*)&clear_color);       // Edit 3 floats representing a color
-
-	if (ImGui::Button("Button"))                                  // Buttons return true when clicked (most widgets return true when edited/activated)
-		counter++;
-	ImGui::SameLine();
-	ImGui::Text("counter = %d", counter);
+	glm::vec3 color = glm::vec3(clearColor.value.r, clearColor.value.g, clearColor.value.b);
+	ImGui::ColorEdit3("clear color", (float*)&color); // Edit 3 floats representing a color
+	clearColor.value = { color.r, color.g, color.b, clearColor.value.a };
 
 	ImGuiIO& io = ImGui::GetIO();
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-	ImGui::End();
 
-	ImGui::ShowDemoWindow();
+	ImGui::End();
 
     // Draw the UI
     ImGui::EndFrame();
-    // Convert the UI defined above into low-level drawing commands
     ImGui::Render();
-    // Execute the low-level drawing commands on the WebGPU backend
     ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
 }
 
@@ -504,7 +498,7 @@ void CreateSurface(ES::Engine::Core &core) {
 	auto &instance = core.GetResource<wgpu::Instance>();
 	auto glfwWindow = core.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow();
 
- 		wgpu::Surface &surface = core.RegisterResource(wgpu::Surface(glfwCreateWindowWGPUSurface(instance, glfwWindow)));
+	wgpu::Surface &surface = core.RegisterResource(wgpu::Surface(glfwCreateWindowWGPUSurface(instance, glfwWindow)));
 
 	glfwMakeContextCurrent(glfwWindow);
 
@@ -721,10 +715,6 @@ wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
 wgpu::RenderPassEncoder renderPass = nullptr;
 wgpu::TextureView textureView = nullptr;
 
-struct ClearColor {
-	wgpu::Color value = { 0.05, 0.05, 0.05, 1.0 };
-};
-
 void Clear(ES::Engine::Core &core) {
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
@@ -833,7 +823,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	// Set binding group
 	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
 
-	UpdateGui(renderPass);
+	UpdateGui(renderPass, core);
 
 	renderPass.end();
 	renderPass.release();
@@ -1155,17 +1145,6 @@ auto main(int ac, char **av) -> int
 
 	core.RegisterSystem(MovementSystem);
 
-	core.RegisterSystem([](ES::Engine::Core &core) {
-		auto &clearColor = core.GetResource<ClearColor>();
-		auto dt = core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
-		static float time = 0.0f;
-		time += dt;
-
-		clearColor.value.r = 0.5f + 0.5f * std::sin(time * 0.5f);
-		clearColor.value.g = 0.5f + 0.5f * std::sin(time * 0.7f);
-		clearColor.value.b = 0.5f + 0.5f * std::sin(time * 0.9f);
-	});
-
 	core.RegisterSystem<ES::Engine::Scheduler::FixedTimeUpdate>([](ES::Engine::Core &core) {
 		auto &drag = core.GetResource<DragState>();
 		auto &cameraState = core.GetResource<CameraData>();
@@ -1292,20 +1271,6 @@ auto main(int ac, char **av) -> int
 
 		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
-	});
-
-	core.RegisterSystem([&](ES::Engine::Core &core) {
-		auto dt = core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
-		static float time = 0.0f;
-		static int frames = 0;
-		time += dt;
-		frames++;
-
-		if (time >= 1.0f) {
-			std::cout << "FPS: " << frames << std::endl;
-			time = 0.0f;
-			frames = 0;
-		}
 	});
 
 	core.RunCore();
