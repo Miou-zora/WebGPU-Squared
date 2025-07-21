@@ -374,11 +374,11 @@ void InitializeBuffers(ES::Engine::Core &core)
 	MyUniforms uniforms;
 	uniforms.time = 1.0f;
 	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
-	float near = 0.001f;
-	float far = 100.0f;
+	float near_value = 0.001f;
+	float far_value = 100.0f;
 	float ratio = 800.0f / 800.0f;
 	float fov = glm::radians(45.0f);
-	uniforms.projectionMatrix = glm::perspective(fov, ratio, near, far);
+	uniforms.projectionMatrix = glm::perspective(fov, ratio, near_value, far_value);
 	queue.writeBuffer(uniformBuffer, 0, &uniforms, sizeof(uniforms));
 }
 
@@ -504,7 +504,7 @@ void CreateSurface(ES::Engine::Core &core) {
 	auto &instance = core.GetResource<wgpu::Instance>();
 	auto glfwWindow = core.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow();
 
-	wgpu::Surface &surface = core.RegisterResource(wgpu::Surface(glfwCreateWindowWGPUSurface(instance, glfwWindow)));
+ 		wgpu::Surface &surface = core.RegisterResource(wgpu::Surface(glfwCreateWindowWGPUSurface(instance, glfwWindow)));
 
 	glfwMakeContextCurrent(glfwWindow);
 

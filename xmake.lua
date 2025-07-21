@@ -19,6 +19,20 @@ package("glfw3webgpuq")
         add_frameworks("Metal", "Foundation", "QuartzCore")
     end
 
+    on_load(function (package)
+        if package:is_plat("windows") then
+            package:add("defines", "GLFW_EXPOSE_NATIVE_WIN32")
+        elseif package:is_plat("macosx", "iphoneos") then
+            package:add("defines", "GLFW_EXPOSE_NATIVE_COCOA")
+        end
+    
+        if package:config("x11") then
+            package:add("defines", "GLFW_EXPOSE_NATIVE_X11")
+        elseif package:config("wayland") then
+            package:add("defines", "GLFW_EXPOSE_NATIVE_WAYLAND")
+        end
+    end)
+
     on_install("windows|x64", "windows|x86", "linux|x86_64", "macosx|x86_64", "macosx|arm64", function (package)
         if package:is_plat("macosx", "iphoneos") then
             os.mv("glfw3webgpu.c", "glfw3webgpu.m")
