@@ -28,12 +28,25 @@ struct MyUniforms {
     glm::mat4x4 viewMatrix;
     glm::mat4x4 modelMatrix;
     glm::vec4 color;
+    glm::vec3 cameraPosition;
     float time;
-    float _pad[3];
 };
 
 // This assert should stay here as we want this rule to link struct to webgpu struct
 static_assert(sizeof(MyUniforms) % 16 == 0);
+
+struct Light {
+    glm::vec3 position;
+    glm::vec3 color;
+    float intensity;
+	float _pad[1]; // Padding to ensure 16-byte alignment
+};
+
+static_assert(sizeof(Light) % 16 == 0);
+
+std::array<Light, 2> lights = {
+	Light{ { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }, 1.0f }
+};
 
 struct CameraData {
 	glm::vec3 position;
@@ -337,7 +350,7 @@ void InspectDevice(ES::Engine::Core &core) {
 
     wgpu::Limits limits(wgpu::Default);
     limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
-	limits.maxBindGroups = 2;
+	limits.maxBindGroups = 3;
 
     bool success = device.getLimits(&limits) == wgpu::Status::Success;
 
@@ -357,6 +370,7 @@ void InspectDevice(ES::Engine::Core &core) {
 }
 // TODO: Release them
 wgpu::Buffer uniformBuffer = nullptr;
+wgpu::Buffer lightsBuffer = nullptr;
 wgpu::PipelineLayout layout = nullptr;
 wgpu::BindGroupLayout bindGroupLayout = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
@@ -375,6 +389,11 @@ void InitializeBuffers(ES::Engine::Core &core)
 	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
 	uniformBuffer = device.createBuffer(bufferDesc);
 
+	wgpu::BufferDescriptor lightsBufferDesc(wgpu::Default);
+	lightsBufferDesc.size = sizeof(Light) * lights.size();
+	lightsBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
+	lightsBuffer = device.createBuffer(lightsBufferDesc);
+
 	// Upload the initial value of the uniforms
 	MyUniforms uniforms;
 	uniforms.time = 1.0f;
@@ -385,6 +404,8 @@ void InitializeBuffers(ES::Engine::Core &core)
 	float fov = glm::radians(45.0f);
 	uniforms.projectionMatrix = glm::perspective(fov, ratio, near_value, far_value);
 	queue.writeBuffer(uniformBuffer, 0, &uniforms, sizeof(uniforms));
+
+	queue.writeBuffer(lightsBuffer, 0, lights.data(), lights.size() * sizeof(Light));
 }
 
 std::string loadFile(const std::string &filePath) {
@@ -443,9 +464,17 @@ void InitializePipeline(ES::Engine::Core &core)
 	bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
 	bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
 
+	WGPUBindGroupLayoutEntry bindingLayout2 = {0};
+	bindingLayout2.binding = 1;
+	bindingLayout2.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayout2.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+	bindingLayout2.buffer.minBindingSize = sizeof(Light) * lights.size();
+
+	std::array<WGPUBindGroupLayoutEntry, 2> bindings = { bindingLayout, bindingLayout2 };
+
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
-	bindGroupLayoutDesc.entryCount = 1;
-	bindGroupLayoutDesc.entries = &bindingLayout;
+	bindGroupLayoutDesc.entryCount = 2;
+	bindGroupLayoutDesc.entries = bindings.data();
 	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
 	bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
@@ -472,7 +501,6 @@ void InitializePipeline(ES::Engine::Core &core)
     fragmentState.targetCount = 1;
     fragmentState.targets = &colorTarget;
     pipelineDesc.fragment = &fragmentState;
-	pipelineDesc.label = wgpu::StringView("My Render Pipeline");
 	pipelineDesc.layout = layout;
 
 	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
@@ -672,9 +700,15 @@ void ReleaseAdapter(ES::Engine::Core &core)
 	ES::Utils::Log::Info("WebGPU adapter released.");
 }
 
+struct BindGroups {
+	std::map<std::string, wgpu::BindGroup> groups;
+};
+
 void CreateBindingGroup(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
+	//TODO: Put this in a separate system
+	auto &bindGroups = core.RegisterResource(BindGroups());
 
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot create binding group.");
 
@@ -684,15 +718,24 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	binding.buffer = uniformBuffer;
 	binding.size = sizeof(MyUniforms);
 
+	wgpu::BindGroupEntry binding2(wgpu::Default);
+	binding2.binding = 1;
+	binding2.buffer = lightsBuffer;
+	binding2.size = sizeof(Light) * lights.size();
+
+	std::array<wgpu::BindGroupEntry, 2> bindings = { binding, binding2 };
+
 	// A bind group contains one or multiple bindings
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
 	bindGroupDesc.layout = bindGroupLayout;
-	bindGroupDesc.entryCount = 1;
-	bindGroupDesc.entries = &binding;
+	bindGroupDesc.entryCount = 2;
+	bindGroupDesc.entries = bindings.data();
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");
-	const auto &bindGroup = core.RegisterResource(wgpu::BindGroup(device.createBindGroup(bindGroupDesc)));
+	auto bg1 = device.createBindGroup(bindGroupDesc);
 
-	if (bindGroup == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
+	if (bg1 == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
+
+	bindGroups.groups["1"] = bg1;
 }
 
 wgpu::Texture textureToRelease = nullptr;
@@ -822,7 +865,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 
 	// Select which render pipeline to use
 	renderPass.setPipeline(pipeline);
-	auto &bindGroup = core.GetResource<wgpu::BindGroup>();
+	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
 	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
@@ -886,7 +929,7 @@ void DrawGui(ES::Engine::Core &core)
 
 	// Select which render pipeline to use
 	renderPass.setPipeline(pipeline);
-	auto &bindGroup = core.GetResource<wgpu::BindGroup>();
+	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
 	UpdateGui(renderPass, core);
@@ -920,7 +963,7 @@ void DrawMeshes(ES::Engine::Core &core)
 	MyUniforms uniforms;
 
 	uniforms.time = glfwGetTime();
-	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	uniforms.color = { 1.f, 0.3f, 0.1f, 1.0f };
 
 	CameraData cameraData = core.GetResource<CameraData>();
 	uniforms.viewMatrix = glm::lookAt(
@@ -946,11 +989,15 @@ void DrawMeshes(ES::Engine::Core &core)
 	M = glm::translate(M, glm::vec3(0.5, 0.0, 0.0));
 	M = glm::scale(M, glm::vec3(0.2f));
 	uniforms.modelMatrix = M;
+
+	uniforms.cameraPosition = cameraData.position;
+
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(MyUniforms::time));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(MyUniforms::color));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &uniforms.modelMatrix, sizeof(MyUniforms::modelMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, cameraPosition), &uniforms.cameraPosition, sizeof(MyUniforms::cameraPosition));
 
 
 	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
@@ -1015,11 +1062,13 @@ void ReleasePipeline(ES::Engine::Core &core)
 
 void ReleaseBindingGroup(ES::Engine::Core &core)
 {
-	wgpu::BindGroup &bindGroup = core.GetResource<wgpu::BindGroup>();
+	auto &bindGroups = core.GetResource<BindGroups>();
 
-	if (bindGroup) {
-		bindGroup.release();
-		bindGroup = nullptr;
+	for (auto &[key, bindGroup] : bindGroups.groups) {
+		if (bindGroup) {
+			bindGroup.release();
+			bindGroup = nullptr;
+		}
 	}
 }
 
