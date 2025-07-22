@@ -107,7 +107,7 @@ add_requires("wgpu-native ^24.0.0", {configs = {shared = true}})
 add_requires("glfw ^3.4", { configs = {shared = true} })
 -- add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = true} })
 add_requires("glfw3webgpuq v1.3.0-alpha", {configs = {shared = true}, debug = true})
-add_requires("imgui v1.92.0-docking", {configs = {shared = true, glfw = true}})
+add_requires("imgui v1.92.0-docking", {configs = {shared = true, glfw = true, wgpu = true, wgpu_backend = "wgpu"}})
 
 includes("../../EngineSquared/xmake.lua")
 
