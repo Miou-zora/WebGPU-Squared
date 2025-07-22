@@ -38,14 +38,15 @@ static_assert(sizeof(MyUniforms) % 16 == 0);
 struct Light {
     glm::vec3 position;
     glm::vec3 color;
+	glm::vec3 direction;
     float intensity;
-	float _pad[1]; // Padding to ensure 16-byte alignment
+	float _pad[2];
 };
 
 static_assert(sizeof(Light) % 16 == 0);
 
 std::array<Light, 2> lights = {
-	Light{ { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }, 1.0f }
+	Light{ { 0.0f, 500.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, -1.0f, 0.0f }, 1.0f }
 };
 
 struct CameraData {
@@ -983,7 +984,7 @@ void DrawMeshes(ES::Engine::Core &core)
 		cameraData.farPlane
 	);
 
-	float angle1 = uniforms.time;
+	float angle1 = 0;
 	glm::mat4x4 M(1.0);
 	M = glm::rotate(M, angle1, glm::vec3(0.0, 0.0, 1.0));
 	M = glm::translate(M, glm::vec3(0.5, 0.0, 0.0));
