@@ -19,8 +19,7 @@ struct MyUniforms {
 };
 
 struct Light {
-    position: vec3f,
-    color: vec3f,
+    color: vec4f,
     direction: vec3f,
     intensity: f32,
 };
@@ -53,7 +52,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 
     let MatKd: vec3f = uMyUniform.color.rgb;
     let MatKs: vec3f = vec3f(0.4, 0.4, 0.4);
-    let Shiness: f32 = 32.0;
+    let Shiness: f32 = 400.0;
 
 	var color = vec3f(0.0);
     for (var i = 0u; i < arrayLength(&uLights); i++) {
@@ -61,13 +60,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 		let L = normalize(light.direction);
 		let R = reflect(-L, N); // equivalent to 2.0 * dot(N, L) * N - L
 
-		let diffuse = max(0.0, dot(L, N)) * light.color * light.intensity;
+		let diffuse = max(0.0, dot(L, N)) * light.color.rgb * light.intensity;
+        // let diffuse = light.color.rgb;
 
 		// We clamp the dot product to 0 when it is negative
 		let RoV = max(0.0, dot(R, V));
 		let specular = pow(RoV, Shiness);
 
-		color += uMyUniform.color.rgb * MatKd * diffuse + MatKs * specular;
+		color += MatKd * diffuse + MatKs * specular;
     }
     let corrected_color = pow(color, vec3f(2.2));
 	return vec4f(corrected_color, uMyUniform.color.a);

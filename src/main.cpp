@@ -15,11 +15,12 @@
 #include "Object.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <GLFW/glfw3.h>
 #include "RenderingPipeline.hpp"
 
 #include <imgui.h>
-#include "imgui_impl_wgpu.h"
+#include <backends/imgui_impl_wgpu.h>
 #include <backends/imgui_impl_glfw.h>
 
 
@@ -36,18 +37,14 @@ struct MyUniforms {
 static_assert(sizeof(MyUniforms) % 16 == 0);
 
 struct Light {
-    glm::vec3 position;
-    glm::vec3 color;
-	glm::vec3 direction;
-    float intensity;
-	float _pad[2];
+    glm::vec4 color; // 24
+	glm::vec3 direction; // 36
+    float intensity; // 40
 };
 
-static_assert(sizeof(Light) % 16 == 0);
+static_assert(sizeof(Light) % 16 == 0, "Light struct must be 32 bytes for WebGPU alignment");
 
-std::array<Light, 2> lights = {
-	Light{ { 0.0f, 500.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, -1.0f, 0.0f }, 1.0f }
-};
+constexpr size_t MAX_LIGHTS = 16;
 
 struct CameraData {
 	glm::vec3 position;
@@ -267,6 +264,17 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
 	});
 
+	// print all lights
+	auto &lights = core.GetResource<std::vector<Light>>();
+	for (size_t i = 0; i < lights.size(); ++i) {
+		ImGui::PushID(i);
+		ImGui::Text("Light %zu", i);
+		ImGui::ColorEdit4("Color", glm::value_ptr(lights[i].color));
+		ImGui::DragFloat3("Direction", glm::value_ptr(lights[i].direction), 0.1f);
+		ImGui::DragFloat("Intensity", &lights[i].intensity, 0.1f, 0.0f, 10.0f);
+		ImGui::PopID();
+	}
+
 	ImGui::End();
 
     // Draw the UI
@@ -391,20 +399,36 @@ void InitializeBuffers(ES::Engine::Core &core)
 	uniformBuffer = device.createBuffer(bufferDesc);
 
 	wgpu::BufferDescriptor lightsBufferDesc(wgpu::Default);
-	lightsBufferDesc.size = sizeof(Light) * lights.size();
+	lightsBufferDesc.size = sizeof(Light) * MAX_LIGHTS;
 	lightsBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
 	lightsBuffer = device.createBuffer(lightsBufferDesc);
 
 	// Upload the initial value of the uniforms
 	MyUniforms uniforms;
 	uniforms.time = 1.0f;
-	uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	uniforms.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	float near_value = 0.001f;
 	float far_value = 100.0f;
 	float ratio = 800.0f / 800.0f;
 	float fov = glm::radians(45.0f);
 	uniforms.projectionMatrix = glm::perspective(fov, ratio, near_value, far_value);
 	queue.writeBuffer(uniformBuffer, 0, &uniforms, sizeof(uniforms));
+
+	auto &lights = core.RegisterResource(std::vector<Light>(MAX_LIGHTS));
+
+	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
+		lights.at(i) = {
+			.color = { 0.0f, 0.0f, 0.0f, 0.0f },
+			.direction = { 0.0f, 0.0f, 0.0f },
+			.intensity = 0.0f
+		};
+	}
+
+	lights.at(0) = {
+		.color = { 1.0f, 1.0f, 0.0f, 1.0f },
+		.direction = { 0.0f, -1.0f, 0.0f },
+		.intensity = 1.0f
+	};
 
 	queue.writeBuffer(lightsBuffer, 0, lights.data(), lights.size() * sizeof(Light));
 }
@@ -469,7 +493,7 @@ void InitializePipeline(ES::Engine::Core &core)
 	bindingLayout2.binding = 1;
 	bindingLayout2.visibility = wgpu::ShaderStage::Fragment;
 	bindingLayout2.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-	bindingLayout2.buffer.minBindingSize = sizeof(Light) * lights.size();
+	bindingLayout2.buffer.minBindingSize = sizeof(Light) * MAX_LIGHTS;
 
 	std::array<WGPUBindGroupLayoutEntry, 2> bindings = { bindingLayout, bindingLayout2 };
 
@@ -525,7 +549,8 @@ void InitializePipeline(ES::Engine::Core &core)
 	depthStencilState.format = depthTextureFormat;
 	pipelineDesc.depthStencil = &depthStencilState;
 
-	wgpu::RenderPipeline pipeline = core.RegisterResource(wgpu::Device(device).createRenderPipeline(pipelineDesc));
+	// TODO: Use async pipeline creation
+	wgpu::RenderPipeline pipeline = core.RegisterResource(device.createRenderPipeline(pipelineDesc));
 
 	if (pipeline == nullptr) throw std::runtime_error("Could not create render pipeline");
 
@@ -722,7 +747,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	wgpu::BindGroupEntry binding2(wgpu::Default);
 	binding2.binding = 1;
 	binding2.buffer = lightsBuffer;
-	binding2.size = sizeof(Light) * lights.size();
+	binding2.size = sizeof(Light) * MAX_LIGHTS;
 
 	std::array<wgpu::BindGroupEntry, 2> bindings = { binding, binding2 };
 
@@ -964,7 +989,7 @@ void DrawMeshes(ES::Engine::Core &core)
 	MyUniforms uniforms;
 
 	uniforms.time = glfwGetTime();
-	uniforms.color = { 1.f, 0.3f, 0.1f, 1.0f };
+	uniforms.color = { 1.f, 1.0f, 1.0f, 1.0f };
 
 	CameraData cameraData = core.GetResource<CameraData>();
 	uniforms.viewMatrix = glm::lookAt(
@@ -984,22 +1009,17 @@ void DrawMeshes(ES::Engine::Core &core)
 		cameraData.farPlane
 	);
 
-	float angle1 = 0;
-	glm::mat4x4 M(1.0);
-	M = glm::rotate(M, angle1, glm::vec3(0.0, 0.0, 1.0));
-	M = glm::translate(M, glm::vec3(0.5, 0.0, 0.0));
-	M = glm::scale(M, glm::vec3(0.2f));
-	uniforms.modelMatrix = M;
-
 	uniforms.cameraPosition = cameraData.position;
 
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(MyUniforms::time));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(MyUniforms::color));
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &uniforms.modelMatrix, sizeof(MyUniforms::modelMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, cameraPosition), &uniforms.cameraPosition, sizeof(MyUniforms::cameraPosition));
 
+	auto &lights = core.GetResource<std::vector<Light>>();
+
+	queue.writeBuffer(lightsBuffer, 0, lights.data(), sizeof(Light) * MAX_LIGHTS);
 
 	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
 		if (!mesh.enabled) return;
@@ -1245,6 +1265,27 @@ auto main(int ac, char **av) -> int
 		info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
 		info.Device = core.GetResource<wgpu::Device>();
 		ImGui_ImplWGPU_Init(&info);
+	},
+	[](ES::Engine::Core &core) {
+		auto &lights = core.GetResource<std::vector<Light>>();
+
+		lights.at(0) = {
+			.color = { 0.8f, 0.2f, 0.2f, 1.0f },
+			.direction = { 5.0f, 10.0f, 0.0f },
+			.intensity = 0.3f
+		};
+
+		lights.at(1) = {
+			.color = { 0.1f, 0.9f, 0.3f, 1.0f },
+			.direction = { -5.0f, 10.0f, 0.0f },
+			.intensity = 0.3f
+		};
+
+		lights.at(2) = {
+			.color = { 0.0f, 0.0f, 1.0f, 1.0f },
+			.direction = { 0.0f, 10.0f, 5.0f },
+			.intensity = 0.3f
+		};
 	});
 
 	// TODO: avoid defining the camera data in the main.cpp, use default values
