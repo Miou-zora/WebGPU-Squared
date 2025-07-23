@@ -37,12 +37,14 @@ struct MyUniforms {
 static_assert(sizeof(MyUniforms) % 16 == 0);
 
 struct Light {
-    glm::vec4 color; // 24
-	glm::vec3 direction; // 36
-    float intensity; // 40
+    glm::vec4 color; // 16
+	glm::vec3 direction; // 16 + 12 = 28
+    float intensity; // 28 + 4 = 32
+	bool enabled = false; // 32 + 1 = 33
+	char _padding[15] = {0}; // 33 + 15 = 48
 };
 
-static_assert(sizeof(Light) % 16 == 0, "Light struct must be 32 bytes for WebGPU alignment");
+static_assert(sizeof(Light) % 16 == 0, "Light struct must be 16 bytes for WebGPU alignment");
 
 constexpr size_t MAX_LIGHTS = 16;
 
@@ -264,7 +266,7 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
 	});
 
-	// print all lights
+	ImGui::BeginChild("Lights", ImVec2(0, 200));
 	auto &lights = core.GetResource<std::vector<Light>>();
 	for (size_t i = 0; i < lights.size(); ++i) {
 		ImGui::PushID(i);
@@ -272,8 +274,10 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::ColorEdit4("Color", glm::value_ptr(lights[i].color));
 		ImGui::DragFloat3("Direction", glm::value_ptr(lights[i].direction), 0.1f);
 		ImGui::DragFloat("Intensity", &lights[i].intensity, 0.1f, 0.0f, 10.0f);
+		ImGui::Checkbox("Enabled", &lights[i].enabled);
 		ImGui::PopID();
 	}
+	ImGui::EndChild();
 
 	ImGui::End();
 
@@ -415,20 +419,6 @@ void InitializeBuffers(ES::Engine::Core &core)
 	queue.writeBuffer(uniformBuffer, 0, &uniforms, sizeof(uniforms));
 
 	auto &lights = core.RegisterResource(std::vector<Light>(MAX_LIGHTS));
-
-	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
-		lights.at(i) = {
-			.color = { 0.0f, 0.0f, 0.0f, 0.0f },
-			.direction = { 0.0f, 0.0f, 0.0f },
-			.intensity = 0.0f
-		};
-	}
-
-	lights.at(0) = {
-		.color = { 1.0f, 1.0f, 0.0f, 1.0f },
-		.direction = { 0.0f, -1.0f, 0.0f },
-		.intensity = 1.0f
-	};
 
 	queue.writeBuffer(lightsBuffer, 0, lights.data(), lights.size() * sizeof(Light));
 }
@@ -1272,19 +1262,22 @@ auto main(int ac, char **av) -> int
 		lights.at(0) = {
 			.color = { 0.8f, 0.2f, 0.2f, 1.0f },
 			.direction = { 5.0f, 10.0f, 0.0f },
-			.intensity = 0.3f
+			.intensity = 0.3f,
+			.enabled = true
 		};
 
 		lights.at(1) = {
 			.color = { 0.1f, 0.9f, 0.3f, 1.0f },
 			.direction = { -5.0f, 10.0f, 0.0f },
-			.intensity = 0.3f
+			.intensity = 0.3f,
+			.enabled = true
 		};
 
 		lights.at(2) = {
 			.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 			.direction = { 0.0f, 10.0f, 5.0f },
-			.intensity = 0.3f
+			.intensity = 0.3f,
+			.enabled = true
 		};
 	});
 

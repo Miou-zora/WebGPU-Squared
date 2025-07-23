@@ -22,6 +22,7 @@ struct Light {
     color: vec4f,
     direction: vec3f,
     intensity: f32,
+    enabled: u32,
 };
 
 // Anywhere in the global scope (e.g. just before defining vs_main)
@@ -57,6 +58,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	var color = vec3f(0.0);
     for (var i = 0u; i < arrayLength(&uLights); i++) {
         let light = uLights[i];
+
+        if (light.enabled == 0u) {
+            continue; // Skip disabled lights
+        }
+
 		let L = normalize(light.direction);
 		let R = reflect(-L, N); // equivalent to 2.0 * dot(N, L) * N - L
 
