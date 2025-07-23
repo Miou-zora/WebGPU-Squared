@@ -56,9 +56,110 @@
 #include "TerminateDepthBuffer.hpp"
 #include "InitDepthBuffer.hpp"
 #include "UnconfigureSurface.hpp"
+#include "SetupResizableWindow.hpp"
 
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
+
+void Initialize2DPipeline(ES::Engine::Core &core)
+{
+	auto &device = core.GetResource<wgpu::Device>();
+	auto &surface = core.GetResource<wgpu::Surface>();
+	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+	wgpu::TextureFormat surfaceFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
+
+
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize 2D pipeline.");
+	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot initialize 2D pipeline.");
+
+	wgpu::RenderPipelineDescriptor pipelineDesc(wgpu::Default);
+	pipelineDesc.label = wgpu::StringView("2D Render Pipeline");
+
+	wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
+	std::string wgslSource = loadFile("shader2D.wgsl");
+	wgslDesc.code = wgpu::StringView(wgslSource);
+	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
+    shaderDesc.nextInChain = &wgslDesc.chain; // connect the chained extension
+    shaderDesc.label = wgpu::StringView("Shader source from Application.cpp");
+	wgpu::ShaderModule shaderModule = device.createShaderModule(shaderDesc);
+	wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
+
+	std::vector<wgpu::VertexAttribute> vertexAttribs(1);
+
+    // Describe the position attribute
+    vertexAttribs[0].shaderLocation = 0;
+    vertexAttribs[0].format = wgpu::VertexFormat::Float32x3;
+    vertexAttribs[0].offset = 0;
+
+    vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
+    vertexBufferLayout.attributes = vertexAttribs.data();
+
+    vertexBufferLayout.arrayStride = 3 * sizeof(float);
+    vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
+
+	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
+	bindGroupLayoutDesc.entryCount = 0;
+	bindGroupLayoutDesc.entries = nullptr;
+	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
+	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+
+	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
+	layoutDesc.bindGroupLayoutCount = 1;
+	layoutDesc.bindGroupLayouts = reinterpret_cast<WGPUBindGroupLayout*>(&bindGroupLayout);
+	wgpu::PipelineLayout layout = device.createPipelineLayout(layoutDesc);
+
+	pipelineDesc.vertex.bufferCount = 1;
+	pipelineDesc.vertex.buffers = &vertexBufferLayout;
+	pipelineDesc.vertex.module = shaderModule;
+	pipelineDesc.vertex.entryPoint = wgpu::StringView("vs_main");
+
+	wgpu::FragmentState fragmentState(wgpu::Default);
+    fragmentState.module = shaderModule;
+	fragmentState.entryPoint = wgpu::StringView("fs_main");
+
+	wgpu::ColorTargetState colorTarget(wgpu::Default);
+    colorTarget.format = surfaceFormat;
+	colorTarget.writeMask = wgpu::ColorWriteMask::All;
+
+	wgpu::BlendState blendState(wgpu::Default);
+    colorTarget.blend = &blendState;
+    fragmentState.targetCount = 1;
+    fragmentState.targets = &colorTarget;
+    pipelineDesc.fragment = &fragmentState;
+	pipelineDesc.layout = layout;
+
+	int frameBufferSizeX, frameBufferSizeY;
+	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
+
+	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
+	depthTextureDesc.label = wgpu::StringView("Z Buffer");
+	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
+	depthTextureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1u };
+	depthTextureDesc.format = depthTextureFormat;
+	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
+
+	auto depthTextureView = depthTexture.createView();
+	depthTexture.release();
+
+	wgpu::DepthStencilState depthStencilState(wgpu::Default);
+	depthStencilState.depthCompare = wgpu::CompareFunction::Less;
+	depthStencilState.depthWriteEnabled = wgpu::OptionalBool::True;
+	depthStencilState.format = depthTextureFormat;
+	pipelineDesc.depthStencil = &depthStencilState;
+
+	wgpu::RenderPipeline pipeline = device.createRenderPipeline(pipelineDesc);
+
+	if (pipeline == nullptr) throw std::runtime_error("Could not create render pipeline");
+
+	wgpuShaderModuleRelease(shaderModule);
+
+	core.GetResource<Pipelines>().renderPipelines["2D"] = PipelineData{
+		.pipeline = pipeline,
+		.bindGroupLayout = bindGroupLayout,
+		.layout = layout,
+		.depthTextureView = depthTextureView
+	};
+}
 
 namespace ES::Plugin::WebGPU {
 class Plugin : public ES::Engine::APlugin {
@@ -70,6 +171,7 @@ class Plugin : public ES::Engine::APlugin {
 		RequirePlugins<ES::Plugin::Window::Plugin>();
 
 		RegisterResource<ClearColor>(ClearColor());
+		RegisterResource<Pipelines>(Pipelines());
 
 		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
 			CreateInstance,
@@ -87,8 +189,10 @@ class Plugin : public ES::Engine::APlugin {
 			ReleaseAdapter,
 			InspectDevice,
 			InitializePipeline,
+			Initialize2DPipeline,
 			InitializeBuffers,
-			CreateBindingGroup
+			CreateBindingGroup,
+			SetupResizableWindow
 		);
 		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
 			Clear,
@@ -107,6 +211,8 @@ class Plugin : public ES::Engine::APlugin {
 	}
 };
 }
+
+
 
 static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
 {
@@ -150,23 +256,6 @@ void MovementSystem(ES::Engine::Core &core)
 
 }
 
-glm::vec2 lastCursorPos(0.0f, 0.0f);
-
-void onResize(GLFWwindow* window, int width, int height) {
-	auto core = reinterpret_cast<ES::Engine::Core*>(glfwGetWindowUserPointer(window));
-
-    if (core == nullptr) throw std::runtime_error("Window user pointer is null, cannot resize.");
-
-	TerminateDepthBuffer(*core);
-	UnconfigureSurface(*core);
-
-	ConfigureSurface(*core);
-	InitDepthBuffer(*core);
-
-	auto &cameraData = core->GetResource<CameraData>();
-	cameraData.aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-}
-
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
@@ -183,8 +272,10 @@ auto main(int ac, char **av) -> int
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-		// Setup Platform/Renderer backends
+
 		ImGui_ImplGlfw_InitForOther(window.GetGLFWWindow(), true);
+	},
+	[](ES::Engine::Core &core) {
 		ImGui_ImplWGPU_InitInfo info = ImGui_ImplWGPU_InitInfo();
 		info.DepthStencilFormat = depthTextureFormat;
 		info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
@@ -260,21 +351,6 @@ auto main(int ac, char **av) -> int
 	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
-		core.GetResource<ES::Plugin::Window::Resource::Window>().SetResizable(true);
-		core.GetResource<ES::Plugin::Window::Resource::Window>().SetFramebufferSizeCallback(&core, onResize);
-		// Print pixel ratio
-		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-
-		int displayX, displayY;
-		glfwGetFramebufferSize(window.GetGLFWWindow(), &displayX, &displayY);
-		int windowX, windowY;
-		glfwGetWindowSize(window.GetGLFWWindow(), &windowX, &windowY);
-		std::cout << "Display size: " << displayX << "x" << displayY << std::endl;
-		std::cout << "Window size: " << windowX << "x" << windowY << std::endl;
-		std::cout << "Pixel ratio: " << static_cast<float>(displayX) / static_cast<float>(windowX) << std::endl;
-	});
-
-	core.RegisterSystem<ES::Engine::Scheduler::Startup>([&](ES::Engine::Core &core) {
 		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 		auto &inputManager = core.GetResource<ES::Plugin::Input::Resource::InputManager>();
 
@@ -285,15 +361,14 @@ auto main(int ac, char **av) -> int
 			cameraData.fovY = glm::clamp(cameraData.fovY, glm::radians(0.1f), glm::radians(179.9f));
 		});
 
-		inputManager.RegisterKeyCallback([](ES::Engine::Core &cbCore, int key, int, int action, int) {
+		inputManager.RegisterKeyCallback([](ES::Engine::Core &cbCore, int key, int scancode, int action, int mods) {
 			if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 				cbCore.Stop();
 			}
 
 			ImGuiIO& io = ImGui::GetIO();
 			if (io.WantCaptureMouse) {
-				// Don't rotate the camera if the mouse is already captured by an ImGui
-				// interaction at this frame.
+				ImGui_ImplGlfw_KeyCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), key, scancode, action, mods);
 				return;
 			}
 		});

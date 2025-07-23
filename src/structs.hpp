@@ -70,14 +70,22 @@ struct BindGroups {
 	std::map<std::string, wgpu::BindGroup> groups;
 };
 
+struct PipelineData {
+	wgpu::RenderPipeline pipeline = nullptr;
+	wgpu::BindGroupLayout bindGroupLayout = nullptr;
+	wgpu::PipelineLayout layout = nullptr;
+	wgpu::TextureView depthTextureView = nullptr;
+};
+
+struct Pipelines {
+	std::map<std::string, PipelineData> renderPipelines;
+};
+
 constexpr size_t MAX_LIGHTS = 16;
 
 wgpu::Buffer uniformBuffer = nullptr;
 wgpu::Buffer lightsBuffer = nullptr;
-wgpu::PipelineLayout layout = nullptr;
-wgpu::BindGroupLayout bindGroupLayout = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
-wgpu::TextureView depthTextureView = nullptr;
 wgpu::Texture textureToRelease = nullptr;
 wgpu::RenderPassEncoder renderPass = nullptr;
 wgpu::TextureView textureView = nullptr;

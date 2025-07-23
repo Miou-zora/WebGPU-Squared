@@ -2,13 +2,16 @@
 
 #include "Engine.hpp"
 #include "webgpu.hpp"
+#include "structs.hpp"
 
 void ReleasePipeline(ES::Engine::Core &core)
 {
-	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	Pipelines &pipelines = core.GetResource<Pipelines>();
 
-	if (pipeline) {
-		pipeline.release();
-		pipeline = nullptr;
+	for (auto &pair : pipelines.renderPipelines) {
+		if (pair.second.pipeline != nullptr) {
+			pair.second.pipeline.release();
+			pair.second.pipeline = nullptr;
+		}
 	}
 }

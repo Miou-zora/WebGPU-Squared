@@ -7,6 +7,8 @@ void Clear(ES::Engine::Core &core) {
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
+
 	const ClearColor &clearColor = core.GetResource<ClearColor>();
 
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw.");
@@ -32,7 +34,7 @@ void Clear(ES::Engine::Core &core) {
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
 	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.view = pipelineData.depthTextureView;
 	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Clear;
 	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
 	depthStencilAttachment.depthClearValue = 1.0f;

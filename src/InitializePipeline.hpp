@@ -61,12 +61,12 @@ void InitializePipeline(ES::Engine::Core &core)
 	bindGroupLayoutDesc.entryCount = 2;
 	bindGroupLayoutDesc.entries = bindings.data();
 	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
-	bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
 	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
 	layoutDesc.bindGroupLayoutCount = 1;
 	layoutDesc.bindGroupLayouts = reinterpret_cast<WGPUBindGroupLayout*>(&bindGroupLayout);
-	layout = device.createPipelineLayout(layoutDesc);
+	wgpu::PipelineLayout layout = device.createPipelineLayout(layoutDesc);
 
     pipelineDesc.vertex.bufferCount = 1;
     pipelineDesc.vertex.buffers = &vertexBufferLayout;
@@ -100,7 +100,7 @@ void InitializePipeline(ES::Engine::Core &core)
 	depthTextureDesc.format = depthTextureFormat;
 	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
-	depthTextureView = depthTexture.createView();
+	wgpu::TextureView depthTextureView = depthTexture.createView();
 	depthTexture.release();
 
 	wgpu::DepthStencilState depthStencilState(wgpu::Default);
@@ -110,9 +110,16 @@ void InitializePipeline(ES::Engine::Core &core)
 	pipelineDesc.depthStencil = &depthStencilState;
 
 	// TODO: Use async pipeline creation
-	wgpu::RenderPipeline pipeline = core.RegisterResource(device.createRenderPipeline(pipelineDesc));
+	wgpu::RenderPipeline pipeline = device.createRenderPipeline(pipelineDesc);
 
 	if (pipeline == nullptr) throw std::runtime_error("Could not create render pipeline");
 
 	wgpuShaderModuleRelease(shaderModule);
+
+	core.GetResource<Pipelines>().renderPipelines["3D"] = PipelineData{
+		.pipeline = pipeline,
+		.bindGroupLayout = bindGroupLayout,
+		.layout = layout,
+		.depthTextureView = depthTextureView
+	};
 }

@@ -6,7 +6,9 @@
 void CreateBindingGroup(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
+	auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
 	//TODO: Put this in a separate system
+	//TODO: Should we separate this from pipelineData?
 	auto &bindGroups = core.RegisterResource(BindGroups());
 
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot create binding group.");
@@ -26,7 +28,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 
 	// A bind group contains one or multiple bindings
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
-	bindGroupDesc.layout = bindGroupLayout;
+	bindGroupDesc.layout = pipelineData.bindGroupLayout;
 	bindGroupDesc.entryCount = 2;
 	bindGroupDesc.entries = bindings.data();
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");

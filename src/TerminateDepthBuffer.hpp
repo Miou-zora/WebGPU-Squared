@@ -4,8 +4,12 @@
 #include "Engine.hpp"
 
 void TerminateDepthBuffer(ES::Engine::Core &core) {
-	if (depthTextureView) {
-		depthTextureView.release();
-		depthTextureView = nullptr;
+	Pipelines &pipelines = core.GetResource<Pipelines>();
+
+	for (auto &pair : pipelines.renderPipelines) {
+		if (pair.second.depthTextureView) {
+			pair.second.depthTextureView.release();
+			pair.second.depthTextureView = nullptr;
+		}
 	}
 }

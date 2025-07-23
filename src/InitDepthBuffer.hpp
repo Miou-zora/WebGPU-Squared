@@ -18,6 +18,6 @@ void InitDepthBuffer(ES::Engine::Core &core) {
 	depthTextureDesc.format = depthTextureFormat;
 	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
-	depthTextureView = depthTexture.createView();
+	core.GetResource<Pipelines>().renderPipelines["3D"].depthTextureView = depthTexture.createView();
 	depthTexture.release();
 }

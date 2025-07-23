@@ -58,14 +58,9 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 }
 
 void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
-
-	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
-	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
-	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
-	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw mesh.");
 
 	const auto &transformMatrix = transform.getTransformationMatrix();
 
@@ -91,7 +86,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
 	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.view = pipelineData.depthTextureView;
 	depthStencilAttachment.depthClearValue = 1.0f;
 	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
 	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
@@ -101,7 +96,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
 	// Select which render pipeline to use
-	renderPass.setPipeline(pipeline);
+	renderPass.setPipeline(pipelineData.pipeline);
 	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
@@ -127,14 +122,9 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 
 void DrawGui(ES::Engine::Core &core)
 {
-	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["2D"];
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
-
-	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
-	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
-	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
-	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw mesh.");
 
 	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
 	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
@@ -155,7 +145,7 @@ void DrawGui(ES::Engine::Core &core)
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
 	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.view = pipelineData.depthTextureView;
 	depthStencilAttachment.depthClearValue = 1.0f;
 	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
 	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
@@ -165,7 +155,7 @@ void DrawGui(ES::Engine::Core &core)
 	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
 	// Select which render pipeline to use
-	renderPass.setPipeline(pipeline);
+	renderPass.setPipeline(pipelineData.pipeline);
 	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
@@ -189,13 +179,8 @@ void DrawMeshes(ES::Engine::Core &core)
 {
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
-	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
-
-	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw.");
-	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot draw.");
-	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw.");
-	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw.");
 
 	MyUniforms uniforms;
 
