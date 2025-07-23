@@ -1,0 +1,23 @@
+#pragma once
+
+#include <webgpu/webgpu.h>
+#include "Engine.hpp"
+
+void CreateAdapter(ES::Engine::Core &core) {
+	ES::Utils::Log::Info("Requesting adapter...");
+
+	auto &instance = core.GetResource<wgpu::Instance>();
+	auto &surface = core.GetResource<wgpu::Surface>();
+
+	if (instance == nullptr) throw std::runtime_error("WebGPU instance is not created, cannot request adapter");
+	if (surface == nullptr) throw std::runtime_error("Surface is not created, cannot request adapter.");
+
+	wgpu::RequestAdapterOptions adapterOpts(wgpu::Default);
+	adapterOpts.compatibleSurface = surface;
+
+	wgpu::Adapter adapter = core.RegisterResource(RequestAdapterSync(instance, adapterOpts));
+
+	if (adapter == nullptr) throw std::runtime_error("Could not get WebGPU adapter");
+
+	ES::Utils::Log::Info(fmt::format("Got adapter: {}", static_cast<void*>(adapter)));
+}

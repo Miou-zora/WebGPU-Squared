@@ -1,0 +1,245 @@
+#pragma once
+
+#include "webgpu.hpp"
+#include "Engine.hpp"
+#include "structs.hpp"
+#include <imgui.h>
+#include <backends/imgui_impl_wgpu.h>
+#include <backends/imgui_impl_glfw.h>
+
+
+void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
+    // Start the Dear ImGui frame
+    ImGui_ImplWGPU_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+	auto &clearColor = core.GetResource<ClearColor>();
+
+	// Build our UI
+	static float f = 0.0f;
+	static int counter = 0;
+	static bool show_demo_window = true;
+	static bool show_another_window = false;
+
+	ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!"
+
+	glm::vec3 color = glm::vec3(clearColor.value.r, clearColor.value.g, clearColor.value.b);
+	ImGui::ColorEdit3("clear color", (float*)&color); // Edit 3 floats representing a color
+	clearColor.value = { color.r, color.g, color.b, clearColor.value.a };
+
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+
+	core.GetRegistry().view<Mesh, Name>().each([&](Mesh &mesh, Name &name) {
+		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
+	});
+
+	ImGui::BeginChild("Lights");
+	auto &lights = core.GetResource<std::vector<Light>>();
+	for (size_t i = 0; i < lights.size(); ++i) {
+		ImGui::PushID(i);
+		ImGui::Text("Light %zu", i);
+		ImGui::ColorEdit4("Color", glm::value_ptr(lights[i].color));
+		ImGui::DragFloat3("Direction(Directional)/Position(Point)", glm::value_ptr(lights[i].direction), 0.1f);
+		ImGui::DragFloat("Intensity", &lights[i].intensity, 10.f);
+		ImGui::Checkbox("Enabled", (bool *)&lights[i].enabled);
+		ImGui::Combo("Type", (int *)&lights[i].type, "Directional\0Point\0Spot\0");
+		ImGui::PopID();
+	}
+	ImGui::EndChild();
+
+	ImGui::End();
+
+    // Draw the UI
+    ImGui::EndFrame();
+    ImGui::Render();
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
+}
+
+void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw mesh.");
+
+	const auto &transformMatrix = transform.getTransformationMatrix();
+
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
+
+
+	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	encoderDesc.label = wgpu::StringView("My command encoder");
+	auto commandEncoder = device.createCommandEncoder(encoderDesc);
+	if (commandEncoder == nullptr) throw std::runtime_error("Command encoder is not created, cannot draw mesh.");
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("Mesh render pass");
+
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
+	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthClearValue = 1.0f;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+	// Select which render pipeline to use
+	renderPass.setPipeline(pipeline);
+	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
+	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
+
+	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
+	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
+
+	// Set binding group
+	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+
+	renderPass.end();
+	renderPass.release();
+
+	// Finally encode and submit the render pass
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
+	auto command = commandEncoder.finish(cmdBufferDescriptor);
+	commandEncoder.release();
+
+	// std::cout << "Submitting command..." << std::endl;
+	queue.submit(1, &command);
+	command.release();
+}
+
+void DrawGui(ES::Engine::Core &core)
+{
+	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	if (textureView == nullptr) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw mesh.");
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw mesh.");
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw mesh.");
+
+	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	encoderDesc.label = wgpu::StringView("My command encoder");
+	auto commandEncoder = device.createCommandEncoder(encoderDesc);
+	if (commandEncoder == nullptr) throw std::runtime_error("Command encoder is not created, cannot draw mesh.");
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("Mesh render pass");
+
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
+	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthClearValue = 1.0f;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+	// Select which render pipeline to use
+	renderPass.setPipeline(pipeline);
+	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
+	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
+
+	UpdateGui(renderPass, core);
+
+	renderPass.end();
+	renderPass.release();
+
+	// Finally encode and submit the render pass
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
+	auto command = commandEncoder.finish(cmdBufferDescriptor);
+	commandEncoder.release();
+
+	// std::cout << "Submitting command..." << std::endl;
+	queue.submit(1, &command);
+	command.release();
+}
+
+void DrawMeshes(ES::Engine::Core &core)
+{
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
+	wgpu::RenderPipeline &pipeline = core.GetResource<wgpu::RenderPipeline>();
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw.");
+	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot draw.");
+	if (pipeline == nullptr) throw std::runtime_error("WebGPU render pipeline is not created, cannot draw.");
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot draw.");
+
+	MyUniforms uniforms;
+
+	uniforms.time = glfwGetTime();
+	uniforms.color = { 1.f, 1.0f, 1.0f, 1.0f };
+
+	CameraData cameraData = core.GetResource<CameraData>();
+	uniforms.viewMatrix = glm::lookAt(
+		cameraData.position,
+		cameraData.position + glm::vec3(
+			glm::cos(cameraData.yaw) * glm::cos(cameraData.pitch),
+			glm::sin(cameraData.pitch),
+			glm::sin(cameraData.yaw) * glm::cos(cameraData.pitch)
+		),
+		cameraData.up
+	);
+
+	uniforms.projectionMatrix = glm::perspective(
+		cameraData.fovY,
+		cameraData.aspectRatio,
+		cameraData.nearPlane,
+		cameraData.farPlane
+	);
+
+	uniforms.cameraPosition = cameraData.position;
+
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(MyUniforms::time));
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(MyUniforms::color));
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
+	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, cameraPosition), &uniforms.cameraPosition, sizeof(MyUniforms::cameraPosition));
+
+	auto &lights = core.GetResource<std::vector<Light>>();
+
+	queue.writeBuffer(lightsBuffer, 0, lights.data(), sizeof(Light) * MAX_LIGHTS);
+
+	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+		if (!mesh.enabled) return;
+		DrawMesh(core, mesh, transform);
+	});
+
+	DrawGui(core);
+
+	// At the end of the frame
+	textureView.release();
+	surface.present();
+}
