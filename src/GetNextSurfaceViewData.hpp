@@ -4,7 +4,6 @@
 #include "Engine.hpp"
 
 wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
-	// Get the surface texture
 	wgpu::SurfaceTexture surfaceTexture(wgpu::Default);
 	surface.getCurrentTexture(&surfaceTexture);
 	if (

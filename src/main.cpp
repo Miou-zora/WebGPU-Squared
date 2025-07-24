@@ -97,9 +97,19 @@ void Initialize2DPipeline(ES::Engine::Core &core)
     vertexBufferLayout.arrayStride = 3 * sizeof(float);
     vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
 
+		// TODO: find why it does not work with wgpu::BindGroupLayoutEntry
+	WGPUBindGroupLayoutEntry bindingLayout = {0};
+	bindingLayout.binding = 0;
+	bindingLayout.visibility = wgpu::ShaderStage::Vertex;
+	bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
+	bindingLayout.buffer.minBindingSize = sizeof(Uniforms2D);
+
+	std::array<WGPUBindGroupLayoutEntry, 1> bindings = { bindingLayout };
+
+
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
-	bindGroupLayoutDesc.entryCount = 0;
-	bindGroupLayoutDesc.entries = nullptr;
+	bindGroupLayoutDesc.entryCount = 1;
+	bindGroupLayoutDesc.entries = bindings.data();
 	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
@@ -131,16 +141,6 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	int frameBufferSizeX, frameBufferSizeY;
 	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 
-	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
-	depthTextureDesc.label = wgpu::StringView("Z Buffer");
-	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
-	depthTextureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1u };
-	depthTextureDesc.format = depthTextureFormat;
-	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
-
-	auto depthTextureView = depthTexture.createView();
-	depthTexture.release();
-
 	wgpu::DepthStencilState depthStencilState(wgpu::Default);
 	depthStencilState.depthCompare = wgpu::CompareFunction::Less;
 	depthStencilState.depthWriteEnabled = wgpu::OptionalBool::True;
@@ -157,8 +157,64 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 		.pipeline = pipeline,
 		.bindGroupLayout = bindGroupLayout,
 		.layout = layout,
-		.depthTextureView = depthTextureView
 	};
+}
+
+void Create2DPipelineBuffer(ES::Engine::Core &core)
+{
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot initialize buffers.");
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize buffers.");
+
+	wgpu::BufferDescriptor bufferDesc(wgpu::Default);
+	bufferDesc.size = sizeof(Uniforms2D);
+	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+	uniform2DBuffer = device.createBuffer(bufferDesc);
+
+	Uniforms2D uniforms;
+	uniforms.orthoMatrix = glm::ortho(
+		-400.0f, 400.0f,
+		-400.0f, 400.0f
+	);
+	queue.writeBuffer(uniform2DBuffer, 0, &uniforms, sizeof(uniforms));
+}
+
+void CreateBindingGroup2D(ES::Engine::Core &core)
+{
+	auto &device = core.GetResource<wgpu::Device>();
+	auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["2D"];
+	auto &bindGroups = core.GetResource<BindGroups>();
+	//TODO: Put this in a separate system
+	//TODO: Should we separate this from pipelineData?
+
+	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot create binding group.");
+
+	wgpu::BindGroupEntry binding(wgpu::Default);
+	binding.binding = 0;
+	binding.buffer = uniform2DBuffer;
+	binding.size = sizeof(Uniforms2D);
+
+	std::array<wgpu::BindGroupEntry, 1> bindings = { binding };
+
+	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
+	bindGroupDesc.layout = pipelineData.bindGroupLayout;
+	bindGroupDesc.entryCount = 1;
+	bindGroupDesc.entries = bindings.data();
+	bindGroupDesc.label = wgpu::StringView("My Bind Group");
+	auto bg1 = device.createBindGroup(bindGroupDesc);
+
+	if (bg1 == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
+
+	bindGroups.groups["2D"] = bg1;
+}
+
+void GenerateSurfaceTexture(ES::Engine::Core &core)
+{
+	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
+	textureView = GetNextSurfaceViewData(surface);
+	if (textureView == nullptr) throw std::runtime_error("Could not get next surface texture view");
 }
 
 namespace ES::Plugin::WebGPU {
@@ -188,13 +244,17 @@ class Plugin : public ES::Engine::APlugin {
 			ConfigureSurface,
 			ReleaseAdapter,
 			InspectDevice,
+			InitDepthBuffer,
 			InitializePipeline,
 			Initialize2DPipeline,
 			InitializeBuffers,
+			Create2DPipelineBuffer,
 			CreateBindingGroup,
+			CreateBindingGroup2D,
 			SetupResizableWindow
 		);
 		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
+			GenerateSurfaceTexture,
 			Clear,
 			DrawMeshes
 		);
@@ -442,6 +502,12 @@ auto main(int ac, char **av) -> int
 		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Finish");
+	},
+	[&](ES::Engine::Core &core) {
+		auto entity = ES::Engine::Entity(core.CreateEntity());
+
+		entity.AddComponent<Sprite>(core, core, glm::vec2(-50.f, -100.f), glm::vec2(100.0f, 200.0f));
+		entity.AddComponent<Name>(core, "Sprite Example");
 	});
 
 	core.RunCore();

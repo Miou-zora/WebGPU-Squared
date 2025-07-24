@@ -93,16 +93,6 @@ void InitializePipeline(ES::Engine::Core &core)
 	int frameBufferSizeX, frameBufferSizeY;
 	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 
-	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
-	depthTextureDesc.label = wgpu::StringView("Z Buffer");
-	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
-	depthTextureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1u };
-	depthTextureDesc.format = depthTextureFormat;
-	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
-
-	wgpu::TextureView depthTextureView = depthTexture.createView();
-	depthTexture.release();
-
 	wgpu::DepthStencilState depthStencilState(wgpu::Default);
 	depthStencilState.depthCompare = wgpu::CompareFunction::Less;
 	depthStencilState.depthWriteEnabled = wgpu::OptionalBool::True;
@@ -120,6 +110,5 @@ void InitializePipeline(ES::Engine::Core &core)
 		.pipeline = pipeline,
 		.bindGroupLayout = bindGroupLayout,
 		.layout = layout,
-		.depthTextureView = depthTextureView
 	};
 }

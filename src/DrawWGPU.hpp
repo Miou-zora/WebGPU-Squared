@@ -3,6 +3,7 @@
 #include "webgpu.hpp"
 #include "Engine.hpp"
 #include "structs.hpp"
+#include "Sprite.hpp"
 #include <imgui.h>
 #include <backends/imgui_impl_wgpu.h>
 #include <backends/imgui_impl_glfw.h>
@@ -86,7 +87,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
 	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-	depthStencilAttachment.view = pipelineData.depthTextureView;
+	depthStencilAttachment.view = depthTextureView;
 	depthStencilAttachment.depthClearValue = 1.0f;
 	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
 	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
@@ -145,7 +146,7 @@ void DrawGui(ES::Engine::Core &core)
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
 	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-	depthStencilAttachment.view = pipelineData.depthTextureView;
+	depthStencilAttachment.view = depthTextureView;
 	depthStencilAttachment.depthClearValue = 1.0f;
 	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
 	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
@@ -175,12 +176,71 @@ void DrawGui(ES::Engine::Core &core)
 	command.release();
 }
 
+void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
+{
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["2D"];
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw sprite.");
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	encoderDesc.label = wgpu::StringView("My command encoder");
+	auto commandEncoder = device.createCommandEncoder(encoderDesc);
+	if (commandEncoder == nullptr) throw std::runtime_error("Command encoder is not created, cannot draw sprite.");
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	renderPassDesc.label = wgpu::StringView("Sprite render pass");
+
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	renderPassColorAttachment.view = textureView;
+	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
+	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	depthStencilAttachment.view = depthTextureView;
+	depthStencilAttachment.depthClearValue = 1.0f;
+	depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+	// Select which render pipeline to use
+	renderPass.setPipeline(pipelineData.pipeline);
+
+	auto &bindGroup = core.GetResource<BindGroups>().groups["2D"];
+	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
+
+	renderPass.setVertexBuffer(0, sprite.pointBuffer, 0, sprite.pointBuffer.getSize());
+	renderPass.setIndexBuffer(sprite.indexBuffer, wgpu::IndexFormat::Uint32, 0, sprite.indexBuffer.getSize());
+
+	renderPass.drawIndexed(sprite.indexCount, 1, 0, 0, 0);
+
+	renderPass.end();
+	renderPass.release();
+
+	// Finally encode and submit the render pass
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView("Command buffer");
+	auto command = commandEncoder.finish(cmdBufferDescriptor);
+	commandEncoder.release();
+
+	// std::cout << "Submitting command..." << std::endl;
+	queue.submit(1, &command);
+	command.release();
+}
+
 void DrawMeshes(ES::Engine::Core &core)
 {
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
-	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 
 	MyUniforms uniforms;
 
@@ -217,9 +277,25 @@ void DrawMeshes(ES::Engine::Core &core)
 
 	queue.writeBuffer(lightsBuffer, 0, lights.data(), sizeof(Light) * MAX_LIGHTS);
 
+	Uniforms2D uniforms2D;
+
+	glm::ivec2 windowSize = window.GetSize();
+
+	uniforms2D.orthoMatrix = glm::ortho(
+		windowSize.x * -0.5f,
+		windowSize.x * 0.5f,
+		windowSize.y * -0.5f,
+		windowSize.y * 0.5f);
+
+	queue.writeBuffer(uniform2DBuffer, 0, &uniforms2D, sizeof(Uniforms2D));
+
 	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
 		if (!mesh.enabled) return;
 		DrawMesh(core, mesh, transform);
+	});
+
+	core.GetRegistry().view<Sprite>().each([&](Sprite &sprite) {
+		DrawSprite(core, sprite);
 	});
 
 	DrawGui(core);

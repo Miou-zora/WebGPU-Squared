@@ -74,18 +74,82 @@ struct PipelineData {
 	wgpu::RenderPipeline pipeline = nullptr;
 	wgpu::BindGroupLayout bindGroupLayout = nullptr;
 	wgpu::PipelineLayout layout = nullptr;
-	wgpu::TextureView depthTextureView = nullptr;
+};
+
+struct Sprite {
+	wgpu::Buffer pointBuffer = nullptr;
+	wgpu::Buffer indexBuffer = nullptr;
+	uint32_t indexCount = 0;
+
+	bool enabled = true;
+
+	Sprite() = default;
+
+	Sprite(ES::Engine::Core &core, glm::vec2 position, glm::vec2 size) {
+		auto &device = core.GetResource<wgpu::Device>();
+		auto &queue = core.GetResource<wgpu::Queue>();
+
+		std::vector<float> pointData = {
+			position.x, position.y, 0.0f, // Bottom left
+			position.x + size.x, position.y, 0.0f, // Bottom right
+			position.x + size.x, position.y + size.y, 0.0f, // Top right
+			position.x, position.y + size.y, 0.0f // Top left
+		};
+
+		std::vector<uint32_t> indexData = {
+			0, 1, 2, // Triangle 1
+			0, 2, 3  // Triangle 2
+		};
+
+		indexCount = indexData.size();
+
+		wgpu::BufferDescriptor bufferDesc(wgpu::Default);
+		bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
+		bufferDesc.mappedAtCreation = false;
+		bufferDesc.size = pointData.size() * sizeof(float);
+		pointBuffer = device.createBuffer(bufferDesc);
+
+		queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
+
+		bufferDesc.size = indexData.size() * sizeof(uint32_t);
+		bufferDesc.size = (bufferDesc.size + 3) & ~3;
+		indexData.resize((indexData.size() + 1) & ~1);
+		bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
+		indexBuffer = device.createBuffer(bufferDesc);
+
+		queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
+	}
+
+	void Release() {
+		if (pointBuffer) {
+			pointBuffer.destroy();
+			pointBuffer.release();
+			pointBuffer = nullptr;
+		}
+		if (indexBuffer) {
+			indexBuffer.destroy();
+			indexBuffer.release();
+			indexBuffer = nullptr;
+		}
+		indexCount = 0;
+	}
 };
 
 struct Pipelines {
 	std::map<std::string, PipelineData> renderPipelines;
 };
 
+struct Uniforms2D {
+	glm::mat4 orthoMatrix;
+};
+
 constexpr size_t MAX_LIGHTS = 16;
 
 wgpu::Buffer uniformBuffer = nullptr;
+wgpu::Buffer uniform2DBuffer = nullptr;
 wgpu::Buffer lightsBuffer = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 wgpu::Texture textureToRelease = nullptr;
 wgpu::RenderPassEncoder renderPass = nullptr;
 wgpu::TextureView textureView = nullptr;
+wgpu::TextureView depthTextureView = nullptr;
