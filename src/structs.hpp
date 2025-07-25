@@ -90,10 +90,11 @@ struct Sprite {
 		auto &queue = core.GetResource<wgpu::Queue>();
 
 		std::vector<float> pointData = {
-			position.x, position.y, 0.0f, // Bottom left
-			position.x + size.x, position.y, 0.0f, // Bottom right
-			position.x + size.x, position.y + size.y, 0.0f, // Top right
-			position.x, position.y + size.y, 0.0f // Top left
+			// Position.x, Position.y, Position.z, U, V
+			position.x, position.y, 0.0f, 0.0f, 0.0f, // Bottom left
+			position.x + size.x, position.y, 0.0f, 1.0f, 0.0f, // Bottom right
+			position.x + size.x, position.y + size.y, 0.0f, 1.0f, 1.0f, // Top right
+			position.x, position.y + size.y, 0.0f, 0.0f, 1.0f // Top left
 		};
 
 		std::vector<uint32_t> indexData = {

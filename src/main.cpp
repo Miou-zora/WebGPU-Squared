@@ -61,7 +61,9 @@
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
 
-float cameraScale = 1.0f;
+float cameraScale = 100.0f;
+
+wgpu::TextureView customTextureView;
 
 void Initialize2DPipeline(ES::Engine::Core &core)
 {
@@ -86,17 +88,21 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	wgpu::ShaderModule shaderModule = device.createShaderModule(shaderDesc);
 	wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
 
-	std::vector<wgpu::VertexAttribute> vertexAttribs(1);
+	std::vector<wgpu::VertexAttribute> vertexAttribs(2);
 
     // Describe the position attribute
     vertexAttribs[0].shaderLocation = 0;
     vertexAttribs[0].format = wgpu::VertexFormat::Float32x3;
     vertexAttribs[0].offset = 0;
 
+	vertexAttribs[1].shaderLocation = 1;
+	vertexAttribs[1].format = wgpu::VertexFormat::Float32x2;
+	vertexAttribs[1].offset = 3 * sizeof(float); // Offset by the size of the position attribute
+
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 3 * sizeof(float);
+    vertexBufferLayout.arrayStride = (3 * sizeof(float)) + (2 * sizeof(float));
     vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
 
 		// TODO: find why it does not work with wgpu::BindGroupLayoutEntry
@@ -106,11 +112,16 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
 	bindingLayout.buffer.minBindingSize = sizeof(Uniforms2D);
 
-	std::array<WGPUBindGroupLayoutEntry, 1> bindings = { bindingLayout };
+	WGPUBindGroupLayoutEntry textureBindingLayout = {0};
+	textureBindingLayout.binding = 1;
+	textureBindingLayout.visibility = wgpu::ShaderStage::Fragment;
+	textureBindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
+	textureBindingLayout.texture.viewDimension = wgpu::TextureViewDimension::_2D;
 
+	std::array<WGPUBindGroupLayoutEntry, 2> bindings = { bindingLayout, textureBindingLayout };
 
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
-	bindGroupLayoutDesc.entryCount = 1;
+	bindGroupLayoutDesc.entryCount = bindings.size();
 	bindGroupLayoutDesc.entries = bindings.data();
 	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
@@ -198,11 +209,15 @@ void CreateBindingGroup2D(ES::Engine::Core &core)
 	binding.buffer = uniform2DBuffer;
 	binding.size = sizeof(Uniforms2D);
 
-	std::array<wgpu::BindGroupEntry, 1> bindings = { binding };
+	wgpu::BindGroupEntry textureBinding(wgpu::Default);
+	textureBinding.binding = 1;
+	textureBinding.textureView = customTextureView;
+
+	std::array<wgpu::BindGroupEntry, 2> bindings = { binding, textureBinding };
 
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
 	bindGroupDesc.layout = pipelineData.bindGroupLayout;
-	bindGroupDesc.entryCount = 1;
+	bindGroupDesc.entryCount = bindings.size();
 	bindGroupDesc.entries = bindings.data();
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");
 	auto bg1 = device.createBindGroup(bindGroupDesc);
@@ -217,6 +232,59 @@ void GenerateSurfaceTexture(ES::Engine::Core &core)
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
 	textureView = GetNextSurfaceViewData(surface);
 	if (textureView == nullptr) throw std::runtime_error("Could not get next surface texture view");
+}
+
+
+void CreateTexture(ES::Engine::Core &core)
+{
+	auto &device = core.GetResource<wgpu::Device>();
+	auto &queue = core.GetResource<wgpu::Queue>();
+
+	wgpu::TextureDescriptor textureDesc;
+	textureDesc.label = wgpu::StringView("Custom Texture");
+	textureDesc.size = { 100, 200, 1 };
+	textureDesc.dimension = wgpu::TextureDimension::_2D;
+	textureDesc.mipLevelCount = 1;
+	textureDesc.sampleCount = 1;
+	textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+	textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+	textureDesc.viewFormats = nullptr;
+	textureDesc.viewFormatCount = 0;
+	wgpu::Texture texture = device.createTexture(textureDesc);
+
+	wgpu::TextureViewDescriptor textureViewDesc;
+	textureViewDesc.aspect = wgpu::TextureAspect::All;
+	textureViewDesc.baseArrayLayer = 0;
+	textureViewDesc.arrayLayerCount = 1;
+	textureViewDesc.baseMipLevel = 0;
+	textureViewDesc.mipLevelCount = 1;
+	textureViewDesc.dimension = wgpu::TextureViewDimension::_2D;
+	textureViewDesc.format = textureDesc.format;
+	customTextureView = texture.createView(textureViewDesc);
+
+	wgpu::TexelCopyTextureInfo destination;
+	destination.texture = texture;
+	destination.mipLevel = 0;
+	destination.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
+	destination.aspect = wgpu::TextureAspect::All;
+
+	wgpu::TexelCopyBufferLayout source;
+	source.offset = 0;
+	source.bytesPerRow = 4 * textureDesc.size.width;
+	source.rowsPerImage = textureDesc.size.height;
+
+	std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
+	for (uint32_t i = 0; i < textureDesc.size.width; ++i) {
+		for (uint32_t j = 0; j < textureDesc.size.height; ++j) {
+			uint8_t *p = &pixels[4 * (j * textureDesc.size.width + i)];
+			p[0] = (i / 16) % 2 == (j / 16) % 2 ? 255 : 0; // r
+			p[1] = ((i - j) / 16) % 2 == 0 ? 255 : 0; // g
+			p[2] = ((i + j) / 16) % 2 == 0 ? 255 : 0; // b
+			p[3] = 255; // a
+		}
+	}
+
+	queue.writeTexture(destination, pixels.data(), pixels.size(), source, textureDesc.size);
 }
 
 namespace ES::Plugin::WebGPU {
@@ -252,6 +320,7 @@ class Plugin : public ES::Engine::APlugin {
 			InitializeBuffers,
 			Create2DPipelineBuffer,
 			CreateBindingGroup,
+			CreateTexture,
 			CreateBindingGroup2D,
 			SetupResizableWindow
 		);
@@ -384,7 +453,7 @@ auto main(int ac, char **av) -> int
 
 	// TODO: avoid defining the camera data in the main.cpp, use default values
 	core.RegisterResource<CameraData>({
-		.position = { 0.0f, 10.0f, 0.0f },
+		.position = { 0.0f, 100.0f, 0.0f },
 		.yaw = 4.75f,
 		.pitch = -0.75f,
 		.up = { 0.0f, 1.0f, 0.0f },

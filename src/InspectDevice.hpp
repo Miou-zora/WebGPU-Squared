@@ -19,6 +19,8 @@ void InspectDevice(ES::Engine::Core &core) {
     wgpu::Limits limits(wgpu::Default);
     limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
 	limits.maxBindGroups = 3;
+    limits.maxSampledTexturesPerShaderStage = 1;
+    limits.maxInterStageShaderVariables = 8;
 
     bool success = device.getLimits(&limits) == wgpu::Status::Success;
 
