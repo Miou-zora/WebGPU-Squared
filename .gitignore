@@ -2,3 +2,4 @@
 build
 .xmake
 imgui.ini
+.DS_Store

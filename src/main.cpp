@@ -61,6 +61,8 @@
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
 
+float cameraScale = 1.0f;
+
 void Initialize2DPipeline(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
@@ -285,11 +287,12 @@ static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
     if (inputManager.IsKeyPressed(GLFW_KEY_S)) {
         force.z -= 1.0f;
     }
+	//TODO: check why X axis is inverted
     if (inputManager.IsKeyPressed(GLFW_KEY_A)) {
-        force.x -= 1.0f;
+        force.x += 1.0f;
     }
     if (inputManager.IsKeyPressed(GLFW_KEY_D)) {
-        force.x += 1.0f;
+        force.x -= 1.0f;
     }
 	if (inputManager.IsKeyPressed(GLFW_KEY_SPACE)) {
 		force.y += 1.0f;
@@ -309,9 +312,21 @@ void MovementSystem(ES::Engine::Core &core)
 {
 	auto &cameraData = core.GetResource<CameraData>();
 
+	glm::vec3 forwardDir = glm::vec3(
+		glm::cos(cameraData.yaw) * glm::cos(cameraData.pitch),
+		glm::sin(cameraData.pitch),
+		glm::sin(cameraData.yaw) * glm::cos(cameraData.pitch)
+	);
+	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::vec3 rightDir = glm::normalize(glm::cross(forwardDir, up));
+	glm::vec3 downDir = glm::normalize(glm::cross(rightDir, forwardDir));
 	glm::vec3 movementForce = GetKeyboardMovementForce(core);
 	if (glm::length(movementForce) > 0.0f) {
-		cameraData.position += movementForce * 1.f;
+		glm::vec3 movementDirection =
+			forwardDir * movementForce.z +
+			downDir * movementForce.y +
+			rightDir * movementForce.x;
+		cameraData.position += movementDirection * 1.f * cameraScale * core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
 	}
 
 }
@@ -369,7 +384,7 @@ auto main(int ac, char **av) -> int
 
 	// TODO: avoid defining the camera data in the main.cpp, use default values
 	core.RegisterResource<CameraData>({
-		.position = { 0.0f, 300.0f, 0.0f },
+		.position = { 0.0f, 10.0f, 0.0f },
 		.yaw = 4.75f,
 		.pitch = -0.75f,
 		.up = { 0.0f, 1.0f, 0.0f },
@@ -388,7 +403,12 @@ auto main(int ac, char **av) -> int
 		.scrollSensitivity = 0.1f
 	});
 
-	core.RegisterSystem(MovementSystem);
+	core.RegisterSystem(MovementSystem,
+	[](ES::Engine::Core &core) {
+		auto &cameraData = core.GetResource<CameraData>();
+		cameraData.farPlane = 100.0f * cameraScale;
+		cameraData.nearPlane = 0.1f * cameraScale;
+	});
 
 	core.RegisterSystem<ES::Engine::Scheduler::FixedTimeUpdate>([](ES::Engine::Core &core) {
 		auto &drag = core.GetResource<DragState>();
@@ -430,6 +450,14 @@ auto main(int ac, char **av) -> int
 			if (io.WantCaptureMouse) {
 				ImGui_ImplGlfw_KeyCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), key, scancode, action, mods);
 				return;
+			}
+
+			if (key == GLFW_KEY_M && action == GLFW_PRESS) {
+				cameraScale *= 10.f;
+			} else if (key == GLFW_KEY_N && action == GLFW_PRESS) {
+				cameraScale /= 10.f;
+			} else if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+				cameraScale = 1.0f;
 			}
 		});
 
