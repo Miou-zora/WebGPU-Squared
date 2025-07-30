@@ -2,6 +2,9 @@
 #define GLM_FORCE_LEFT_HANDED
 #include <glm/ext.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #define WEBGPU_CPP_IMPLEMENTATION
 #include "webgpu.hpp"
 #include <glfw3webgpu.h>
@@ -64,6 +67,7 @@ uint32_t uniformStride = 0;
 float cameraScale = 100.0f;
 
 wgpu::TextureView customTextureView;
+wgpu::Sampler customSampler;
 
 void Initialize2DPipeline(ES::Engine::Core &core)
 {
@@ -118,7 +122,12 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	textureBindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
 	textureBindingLayout.texture.viewDimension = wgpu::TextureViewDimension::_2D;
 
-	std::array<WGPUBindGroupLayoutEntry, 2> bindings = { bindingLayout, textureBindingLayout };
+	WGPUBindGroupLayoutEntry samplerBindingLayout = {0};
+	samplerBindingLayout.binding = 2;
+	samplerBindingLayout.visibility = wgpu::ShaderStage::Fragment;
+	samplerBindingLayout.sampler.type = wgpu::SamplerBindingType::Filtering;
+
+	std::array<WGPUBindGroupLayoutEntry, 3> bindings = { bindingLayout, textureBindingLayout, samplerBindingLayout };
 
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
 	bindGroupLayoutDesc.entryCount = bindings.size();
@@ -173,6 +182,67 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	};
 }
 
+// Auxiliary function for loadTexture
+static void writeMipMaps(
+    wgpu::Device device,
+    wgpu::Texture texture,
+    wgpu::Extent3D textureSize,
+    [[maybe_unused]] uint32_t mipLevelCount, // not used yet
+    const unsigned char* pixelData)
+{
+    wgpu::TexelCopyTextureInfo destination;
+    destination.texture = texture;
+    destination.mipLevel = 0;
+    destination.origin = { 0, 0, 0 };
+    destination.aspect = wgpu::TextureAspect::All;
+
+    wgpu::TexelCopyBufferLayout source;
+    source.offset = 0;
+    source.bytesPerRow = 4 * textureSize.width;
+    source.rowsPerImage = textureSize.height;
+
+    wgpu::Queue queue = device.getQueue();
+    queue.writeTexture(destination, pixelData, 4 * textureSize.width * textureSize.height, source, textureSize);
+    queue.release();
+}
+
+wgpu::Texture loadTexture(const std::filesystem::path& path, wgpu::Device device, wgpu::TextureView* pTextureView = nullptr) {
+    int width, height, channels;
+    unsigned char *pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 4 /* force 4 channels */);
+
+	if (nullptr == pixelData) return nullptr;
+
+    wgpu::TextureDescriptor textureDesc;
+    textureDesc.dimension = wgpu::TextureDimension::_2D;
+    textureDesc.format = wgpu::TextureFormat::RGBA8UnormSrgb; // by convention for bmp, png and jpg file. Be careful with other formats.
+    textureDesc.mipLevelCount = 1;
+    textureDesc.sampleCount = 1;
+    textureDesc.size = { (unsigned int)width, (unsigned int)height, 1 };
+    textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+    textureDesc.viewFormatCount = 0;
+    textureDesc.viewFormats = nullptr;
+    wgpu::Texture texture = device.createTexture(textureDesc);
+
+    // Upload data to the GPU texture (to be implemented!)
+    writeMipMaps(device, texture, textureDesc.size, textureDesc.mipLevelCount, pixelData);
+
+    stbi_image_free(pixelData);
+
+    if (pTextureView) {
+        wgpu::TextureViewDescriptor textureViewDesc;
+        textureViewDesc.aspect = wgpu::TextureAspect::All;
+        textureViewDesc.baseArrayLayer = 0;
+        textureViewDesc.arrayLayerCount = 1;
+        textureViewDesc.baseMipLevel = 0;
+        textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+        textureViewDesc.dimension = wgpu::TextureViewDimension::_2D;
+        textureViewDesc.format = textureDesc.format;
+        *pTextureView = texture.createView(textureViewDesc);
+    }
+
+    return texture;
+}
+
 void Create2DPipelineBuffer(ES::Engine::Core &core)
 {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
@@ -213,7 +283,11 @@ void CreateBindingGroup2D(ES::Engine::Core &core)
 	textureBinding.binding = 1;
 	textureBinding.textureView = customTextureView;
 
-	std::array<wgpu::BindGroupEntry, 2> bindings = { binding, textureBinding };
+	wgpu::BindGroupEntry samplerBinding(wgpu::Default);
+	samplerBinding.binding = 2;
+	samplerBinding.sampler = customSampler;
+
+	std::array<wgpu::BindGroupEntry, 3> bindings = { binding, textureBinding, samplerBinding };
 
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
 	bindGroupDesc.layout = pipelineData.bindGroupLayout;
@@ -285,7 +359,45 @@ void CreateTexture(ES::Engine::Core &core)
 	}
 
 	queue.writeTexture(destination, pixels.data(), pixels.size(), source, textureDesc.size);
+
+	wgpu::SamplerDescriptor samplerDesc;
+	samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
+	samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
+	samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
+	samplerDesc.magFilter = wgpu::FilterMode::Nearest;
+	samplerDesc.minFilter = wgpu::FilterMode::Linear;
+	samplerDesc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+	samplerDesc.lodMinClamp = 0.0f;
+	samplerDesc.lodMaxClamp = 1.0f;
+	samplerDesc.compare = wgpu::CompareFunction::Undefined;
+	samplerDesc.maxAnisotropy = 1;
+	customSampler = device.createSampler(samplerDesc);
 }
+
+void CreateTexture2(ES::Engine::Core &core)
+{
+	auto &device = core.GetResource<wgpu::Device>();
+	auto &queue = core.GetResource<wgpu::Queue>();
+
+	stbi_set_flip_vertically_on_load(true);
+
+	wgpu::Texture texture = loadTexture("./assets/insect.png", device, &customTextureView);
+	if (!texture) throw std::runtime_error("Failed to load texture from file.");
+
+	wgpu::SamplerDescriptor samplerDesc;
+	samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
+	samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
+	samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
+	samplerDesc.magFilter = wgpu::FilterMode::Linear;
+	samplerDesc.minFilter = wgpu::FilterMode::Linear;
+	samplerDesc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+	samplerDesc.lodMinClamp = 0.0f;
+	samplerDesc.lodMaxClamp = 1.0f;
+	samplerDesc.compare = wgpu::CompareFunction::Undefined;
+	samplerDesc.maxAnisotropy = 1;
+	customSampler = device.createSampler(samplerDesc);
+}
+
 
 namespace ES::Plugin::WebGPU {
 class Plugin : public ES::Engine::APlugin {
@@ -320,7 +432,7 @@ class Plugin : public ES::Engine::APlugin {
 			InitializeBuffers,
 			Create2DPipelineBuffer,
 			CreateBindingGroup,
-			CreateTexture,
+			CreateTexture2,
 			CreateBindingGroup2D,
 			SetupResizableWindow
 		);
@@ -603,7 +715,7 @@ auto main(int ac, char **av) -> int
 	[&](ES::Engine::Core &core) {
 		auto entity = ES::Engine::Entity(core.CreateEntity());
 
-		entity.AddComponent<Sprite>(core, core, glm::vec2(-50.f, -100.f), glm::vec2(100.0f, 200.0f));
+		entity.AddComponent<Sprite>(core, core, glm::vec2(-50.f, -100.f), glm::vec2(284.0f, 372.0f));
 		entity.AddComponent<Name>(core, "Sprite Example");
 	});
 
