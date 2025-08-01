@@ -8,7 +8,7 @@ void ReleaseInstance(ES::Engine::Core &core) {
 
 	if (instance == nullptr) throw std::runtime_error("WebGPU instance is already released or was never created.");
 
-	ES::Utils::Log::Info(fmt::format("Releasing WebGPU instance: {}", static_cast<void*>(instance)));
+	ES::Utils::Log::Debug(fmt::format("Releasing WebGPU instance: {}", static_cast<void*>(instance)));
 
 	instance.release();
 	instance = nullptr;

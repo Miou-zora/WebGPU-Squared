@@ -128,6 +128,11 @@ target(project_name)
     add_packages("glfw3webgpuq")
     add_defines("IMGUI_IMPL_WEBGPU_BACKEND_WGPU")
 
+    if is_mode("debug") then
+        add_defines("DEBUG")
+        add_defines("ES_DEBUG")
+    end
+
     add_files("src/**.cpp")
     add_headerfiles("src/**.hpp", { public = true })
     add_includedirs("src/", {public = true})

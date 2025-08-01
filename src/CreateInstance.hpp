@@ -4,7 +4,7 @@
 #include "Engine.hpp"
 
 void CreateInstance(ES::Engine::Core &core) {
-	ES::Utils::Log::Info("Creating WebGPU instance...");
+	ES::Utils::Log::Debug("Creating WebGPU instance...");
 
 	wgpu::InstanceDescriptor desc(wgpu::Default);
 
@@ -12,5 +12,5 @@ void CreateInstance(ES::Engine::Core &core) {
 
 	if (instance == nullptr) throw std::runtime_error("Could not create WebGPU instance");
 
-	ES::Utils::Log::Info(fmt::format("WebGPU instance created: {}", static_cast<void*>(instance)));
+	ES::Utils::Log::Debug(fmt::format("WebGPU instance created: {}", static_cast<void*>(instance)));
 }

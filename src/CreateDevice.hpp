@@ -4,7 +4,7 @@
 #include "Engine.hpp"
 
 void CreateDevice(ES::Engine::Core &core) {
-	ES::Utils::Log::Info("Creating WebGPU device...");
+	ES::Utils::Log::Debug("Creating WebGPU device...");
 
 	auto &adapter = core.GetResource<wgpu::Adapter>();
 
@@ -31,5 +31,5 @@ void CreateDevice(ES::Engine::Core &core) {
 
 	if (device == nullptr) throw std::runtime_error("Could not create WebGPU device");
 
-	ES::Utils::Log::Info(fmt::format("WebGPU device created: {}", static_cast<void*>(device)));
+	ES::Utils::Log::Debug(fmt::format("WebGPU device created: {}", static_cast<void*>(device)));
 }

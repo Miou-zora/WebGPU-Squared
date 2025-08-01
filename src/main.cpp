@@ -347,9 +347,11 @@ class Plugin : public ES::Engine::APlugin {
 			CreateInstance,
 			CreateSurface,
 			CreateAdapter,
+#if defined(ES_DEBUG)
 			AdaptaterPrintLimits,
 			AdaptaterPrintFeatures,
 			AdaptaterPrintProperties,
+#endif
 			ReleaseInstance,
 			RequestCapabilities,
 			CreateDevice,
@@ -357,7 +359,9 @@ class Plugin : public ES::Engine::APlugin {
 			SetupQueueOnSubmittedWorkDone,
 			ConfigureSurface,
 			ReleaseAdapter,
+#if defined(ES_DEBUG)
 			InspectDevice,
+#endif
 			InitDepthBuffer,
 			InitializePipeline,
 			Initialize2DPipeline,
@@ -446,6 +450,10 @@ void MovementSystem(ES::Engine::Core &core)
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
+
+#if defined(ES_DEBUG)
+	spdlog::set_level(spdlog::level::debug);
+#endif
 
 	core.AddPlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin>();
 

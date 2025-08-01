@@ -4,7 +4,7 @@
 #include "Engine.hpp"
 
 void CreateAdapter(ES::Engine::Core &core) {
-	ES::Utils::Log::Info("Requesting adapter...");
+	ES::Utils::Log::Debug("Requesting adapter...");
 
 	auto &instance = core.GetResource<wgpu::Instance>();
 	auto &surface = core.GetResource<wgpu::Surface>();
@@ -18,6 +18,5 @@ void CreateAdapter(ES::Engine::Core &core) {
 	wgpu::Adapter adapter = core.RegisterResource(instance.requestAdapter(adapterOpts));
 
 	if (adapter == nullptr) throw std::runtime_error("Could not get WebGPU adapter");
-
-	ES::Utils::Log::Info(fmt::format("Got adapter: {}", static_cast<void*>(adapter)));
+	ES::Utils::Log::Debug(fmt::format("Got adapter: {}", static_cast<void*>(adapter)));
 }
