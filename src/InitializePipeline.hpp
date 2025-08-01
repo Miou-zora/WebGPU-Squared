@@ -108,7 +108,7 @@ void InitializePipeline(ES::Engine::Core &core)
 
 	core.GetResource<Pipelines>().renderPipelines["3D"] = PipelineData{
 		.pipeline = pipeline,
-		.bindGroupLayout = bindGroupLayout,
+		.bindGroupLayouts = {bindGroupLayout},
 		.layout = layout,
 	};
 }

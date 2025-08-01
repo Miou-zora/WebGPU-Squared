@@ -28,7 +28,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 
 	// A bind group contains one or multiple bindings
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
-	bindGroupDesc.layout = pipelineData.bindGroupLayout;
+	bindGroupDesc.layout = pipelineData.bindGroupLayouts[0];
 	bindGroupDesc.entryCount = 2;
 	bindGroupDesc.entries = bindings.data();
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");

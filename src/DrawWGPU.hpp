@@ -216,6 +216,10 @@ void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
 	auto &bindGroup = core.GetResource<BindGroups>().groups["2D"];
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
+	auto &textures = core.GetResource<TextureManager>();
+	auto texture = textures.Get(sprite.textureHandleID);
+	renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
+
 	renderPass.setVertexBuffer(0, sprite.pointBuffer, 0, sprite.pointBuffer.getSize());
 	renderPass.setIndexBuffer(sprite.indexBuffer, wgpu::IndexFormat::Uint32, 0, sprite.indexBuffer.getSize());
 

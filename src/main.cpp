@@ -66,9 +66,6 @@ uint32_t uniformStride = 0;
 
 float cameraScale = 100.0f;
 
-wgpu::TextureView customTextureView;
-wgpu::Sampler customSampler;
-
 void Initialize2DPipeline(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
@@ -116,28 +113,37 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
 	bindingLayout.buffer.minBindingSize = sizeof(Uniforms2D);
 
+	std::array<WGPUBindGroupLayoutEntry, 1> uniformsBindings = { bindingLayout };
+
+	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
+	bindGroupLayoutDesc.entryCount = uniformsBindings.size();
+	bindGroupLayoutDesc.entries = uniformsBindings.data();
+	bindGroupLayoutDesc.label = wgpu::StringView("Uniforms Bind Group Layout");
+	wgpu::BindGroupLayout uniformsBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+
 	WGPUBindGroupLayoutEntry textureBindingLayout = {0};
-	textureBindingLayout.binding = 1;
+	textureBindingLayout.binding = 0;
 	textureBindingLayout.visibility = wgpu::ShaderStage::Fragment;
 	textureBindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
 	textureBindingLayout.texture.viewDimension = wgpu::TextureViewDimension::_2D;
 
 	WGPUBindGroupLayoutEntry samplerBindingLayout = {0};
-	samplerBindingLayout.binding = 2;
+	samplerBindingLayout.binding = 1;
 	samplerBindingLayout.visibility = wgpu::ShaderStage::Fragment;
 	samplerBindingLayout.sampler.type = wgpu::SamplerBindingType::Filtering;
 
-	std::array<WGPUBindGroupLayoutEntry, 3> bindings = { bindingLayout, textureBindingLayout, samplerBindingLayout };
+	std::array<WGPUBindGroupLayoutEntry, 2> textureBindings = { textureBindingLayout, samplerBindingLayout };
 
-	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
-	bindGroupLayoutDesc.entryCount = bindings.size();
-	bindGroupLayoutDesc.entries = bindings.data();
-	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
-	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+	bindGroupLayoutDesc.entryCount = textureBindings.size();
+	bindGroupLayoutDesc.entries = textureBindings.data();
+	bindGroupLayoutDesc.label = wgpu::StringView("Texture Bind Group Layout");
+	wgpu::BindGroupLayout textureBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+
+	std::array<WGPUBindGroupLayout, 2> bindGroupLayouts = { uniformsBindGroupLayout, textureBindGroupLayout };
 
 	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
-	layoutDesc.bindGroupLayoutCount = 1;
-	layoutDesc.bindGroupLayouts = reinterpret_cast<WGPUBindGroupLayout*>(&bindGroupLayout);
+	layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
+	layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
 	wgpu::PipelineLayout layout = device.createPipelineLayout(layoutDesc);
 
 	pipelineDesc.vertex.bufferCount = 1;
@@ -177,7 +183,10 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 
 	core.GetResource<Pipelines>().renderPipelines["2D"] = PipelineData{
 		.pipeline = pipeline,
-		.bindGroupLayout = bindGroupLayout,
+		.bindGroupLayouts = {
+			uniformsBindGroupLayout,
+			textureBindGroupLayout
+		},
 		.layout = layout,
 	};
 }
@@ -209,31 +218,24 @@ static void writeMipMaps(
 wgpu::Texture loadTexture(const std::filesystem::path& path, wgpu::Device device, wgpu::TextureView* pTextureView = nullptr) {
     int width, height, channels;
     unsigned char *pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 4 /* force 4 channels */);
-
 	if (nullptr == pixelData) return nullptr;
 
     wgpu::TextureDescriptor textureDesc;
-    textureDesc.dimension = wgpu::TextureDimension::_2D;
+	textureDesc.label = wgpu::StringView("Texture from file");
     textureDesc.format = wgpu::TextureFormat::RGBA8UnormSrgb; // by convention for bmp, png and jpg file. Be careful with other formats.
-    textureDesc.mipLevelCount = 1;
-    textureDesc.sampleCount = 1;
     textureDesc.size = { (unsigned int)width, (unsigned int)height, 1 };
     textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
     textureDesc.viewFormatCount = 0;
     textureDesc.viewFormats = nullptr;
     wgpu::Texture texture = device.createTexture(textureDesc);
 
-    // Upload data to the GPU texture (to be implemented!)
     writeMipMaps(device, texture, textureDesc.size, textureDesc.mipLevelCount, pixelData);
 
     stbi_image_free(pixelData);
 
     if (pTextureView) {
-        wgpu::TextureViewDescriptor textureViewDesc;
-        textureViewDesc.aspect = wgpu::TextureAspect::All;
-        textureViewDesc.baseArrayLayer = 0;
+        wgpu::TextureViewDescriptor textureViewDesc(wgpu::Default);
         textureViewDesc.arrayLayerCount = 1;
-        textureViewDesc.baseMipLevel = 0;
         textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
         textureViewDesc.dimension = wgpu::TextureViewDimension::_2D;
         textureViewDesc.format = textureDesc.format;
@@ -264,6 +266,7 @@ void Create2DPipelineBuffer(ES::Engine::Core &core)
 	queue.writeBuffer(uniform2DBuffer, 0, &uniforms, sizeof(uniforms));
 }
 
+
 void CreateBindingGroup2D(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
@@ -279,18 +282,10 @@ void CreateBindingGroup2D(ES::Engine::Core &core)
 	binding.buffer = uniform2DBuffer;
 	binding.size = sizeof(Uniforms2D);
 
-	wgpu::BindGroupEntry textureBinding(wgpu::Default);
-	textureBinding.binding = 1;
-	textureBinding.textureView = customTextureView;
-
-	wgpu::BindGroupEntry samplerBinding(wgpu::Default);
-	samplerBinding.binding = 2;
-	samplerBinding.sampler = customSampler;
-
-	std::array<wgpu::BindGroupEntry, 3> bindings = { binding, textureBinding, samplerBinding };
+	std::array<wgpu::BindGroupEntry, 1> bindings = { binding };
 
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
-	bindGroupDesc.layout = pipelineData.bindGroupLayout;
+	bindGroupDesc.layout = pipelineData.bindGroupLayouts[0];
 	bindGroupDesc.entryCount = bindings.size();
 	bindGroupDesc.entries = bindings.data();
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");
@@ -308,95 +303,33 @@ void GenerateSurfaceTexture(ES::Engine::Core &core)
 	if (textureView == nullptr) throw std::runtime_error("Could not get next surface texture view");
 }
 
+// std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
+// 	for (uint32_t i = 0; i < textureDesc.size.width; ++i) {
+// 		for (uint32_t j = 0; j < textureDesc.size.height; ++j) {
+// 			uint8_t *p = &pixels[4 * (j * textureDesc.size.width + i)];
+// 			glm::u8vec4 color = callback(glm::uvec2(i, j));
+// 			p[0] = color.r;
+// 			p[1] = color.g;
+// 			p[2] = color.b;
+// 			p[3] = color.a;
+// 		}
+// 	}
 
-void CreateTexture(ES::Engine::Core &core)
-{
-	auto &device = core.GetResource<wgpu::Device>();
-	auto &queue = core.GetResource<wgpu::Queue>();
+// 	writeMipMaps(device, texture, textureDesc.size, textureDesc.mipLevelCount, pixels.data());
 
-	wgpu::TextureDescriptor textureDesc;
-	textureDesc.label = wgpu::StringView("Custom Texture");
-	textureDesc.size = { 100, 200, 1 };
-	textureDesc.dimension = wgpu::TextureDimension::_2D;
-	textureDesc.mipLevelCount = 1;
-	textureDesc.sampleCount = 1;
-	textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-	textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
-	textureDesc.viewFormats = nullptr;
-	textureDesc.viewFormatCount = 0;
-	wgpu::Texture texture = device.createTexture(textureDesc);
+// void GenerateTexture(ES::Engine::Core &core)
+// {
+// 	auto &device = core.GetResource<wgpu::Device>();
 
-	wgpu::TextureViewDescriptor textureViewDesc;
-	textureViewDesc.aspect = wgpu::TextureAspect::All;
-	textureViewDesc.baseArrayLayer = 0;
-	textureViewDesc.arrayLayerCount = 1;
-	textureViewDesc.baseMipLevel = 0;
-	textureViewDesc.mipLevelCount = 1;
-	textureViewDesc.dimension = wgpu::TextureViewDimension::_2D;
-	textureViewDesc.format = textureDesc.format;
-	customTextureView = texture.createView(textureViewDesc);
-
-	wgpu::TexelCopyTextureInfo destination;
-	destination.texture = texture;
-	destination.mipLevel = 0;
-	destination.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
-	destination.aspect = wgpu::TextureAspect::All;
-
-	wgpu::TexelCopyBufferLayout source;
-	source.offset = 0;
-	source.bytesPerRow = 4 * textureDesc.size.width;
-	source.rowsPerImage = textureDesc.size.height;
-
-	std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
-	for (uint32_t i = 0; i < textureDesc.size.width; ++i) {
-		for (uint32_t j = 0; j < textureDesc.size.height; ++j) {
-			uint8_t *p = &pixels[4 * (j * textureDesc.size.width + i)];
-			p[0] = (i / 16) % 2 == (j / 16) % 2 ? 255 : 0; // r
-			p[1] = ((i - j) / 16) % 2 == 0 ? 255 : 0; // g
-			p[2] = ((i + j) / 16) % 2 == 0 ? 255 : 0; // b
-			p[3] = 255; // a
-		}
-	}
-
-	queue.writeTexture(destination, pixels.data(), pixels.size(), source, textureDesc.size);
-
-	wgpu::SamplerDescriptor samplerDesc;
-	samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
-	samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
-	samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
-	samplerDesc.magFilter = wgpu::FilterMode::Nearest;
-	samplerDesc.minFilter = wgpu::FilterMode::Linear;
-	samplerDesc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
-	samplerDesc.lodMinClamp = 0.0f;
-	samplerDesc.lodMaxClamp = 1.0f;
-	samplerDesc.compare = wgpu::CompareFunction::Undefined;
-	samplerDesc.maxAnisotropy = 1;
-	customSampler = device.createSampler(samplerDesc);
-}
-
-void CreateTexture2(ES::Engine::Core &core)
-{
-	auto &device = core.GetResource<wgpu::Device>();
-	auto &queue = core.GetResource<wgpu::Queue>();
-
-	stbi_set_flip_vertically_on_load(true);
-
-	wgpu::Texture texture = loadTexture("./assets/insect.png", device, &customTextureView);
-	if (!texture) throw std::runtime_error("Failed to load texture from file.");
-
-	wgpu::SamplerDescriptor samplerDesc;
-	samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
-	samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
-	samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
-	samplerDesc.magFilter = wgpu::FilterMode::Linear;
-	samplerDesc.minFilter = wgpu::FilterMode::Linear;
-	samplerDesc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
-	samplerDesc.lodMinClamp = 0.0f;
-	samplerDesc.lodMaxClamp = 1.0f;
-	samplerDesc.compare = wgpu::CompareFunction::Undefined;
-	samplerDesc.maxAnisotropy = 1;
-	customSampler = device.createSampler(samplerDesc);
-}
+	// CreateTexture(device, { 284, 372 }, [](glm::uvec2 pos) {
+	// 	glm::u8vec4 color;
+	// 	color.r = (pos.x / 16) % 2 == (pos.y / 16) % 2 ? 255 : 0; // r
+	// 	color.g = ((pos.x - pos.y) / 16) % 2 == 0 ? 255 : 0; // g
+	// 	color.b = ((pos.x + pos.y) / 16) % 2 == 0 ? 255 : 0; // b
+	// 	color.a = 255; // a
+	// 	return color;
+	// });
+// }
 
 
 namespace ES::Plugin::WebGPU {
@@ -408,8 +341,9 @@ class Plugin : public ES::Engine::APlugin {
     void Bind() final {
 		RequirePlugins<ES::Plugin::Window::Plugin>();
 
-		RegisterResource<ClearColor>(ClearColor());
-		RegisterResource<Pipelines>(Pipelines());
+		RegisterResource(ClearColor());
+		RegisterResource(Pipelines());
+		RegisterResource(TextureManager());
 
 		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
 			CreateInstance,
@@ -432,7 +366,6 @@ class Plugin : public ES::Engine::APlugin {
 			InitializeBuffers,
 			Create2DPipelineBuffer,
 			CreateBindingGroup,
-			CreateTexture2,
 			CreateBindingGroup2D,
 			SetupResizableWindow
 		);
@@ -715,8 +648,29 @@ auto main(int ac, char **av) -> int
 	[&](ES::Engine::Core &core) {
 		auto entity = ES::Engine::Entity(core.CreateEntity());
 
-		entity.AddComponent<Sprite>(core, core, glm::vec2(-50.f, -100.f), glm::vec2(284.0f, 372.0f));
+		auto &textureManager = core.GetResource<TextureManager>();
+		auto &pipelines = core.GetResource<Pipelines>();
+		textureManager.Add(entt::hashed_string("sprite_example"), core.GetResource<wgpu::Device>(), "./assets/insect.png", pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+
+		entity.AddComponent<Sprite>(core, core, glm::vec2(-50.f, -100.f), glm::vec2(284.0f, 372.0f), entt::hashed_string("sprite_example"));
 		entity.AddComponent<Name>(core, "Sprite Example");
+	},
+	[&](ES::Engine::Core &core) {
+		auto entity = ES::Engine::Entity(core.CreateEntity());
+
+		auto &textureManager = core.GetResource<TextureManager>();
+		auto &pipelines = core.GetResource<Pipelines>();
+		textureManager.Add(entt::hashed_string("sprite_example_2"), core.GetResource<wgpu::Device>(), glm::uvec2(200, 200), [](glm::uvec2 pos) {
+			glm::u8vec4 color;
+			color.r = (pos.x / 16) % 2 == (pos.y / 16) % 2 ? 255 : 0; // r
+			color.g = ((pos.x - pos.y) / 16) % 2 == 0 ? 255 : 0; // g
+			color.b = ((pos.x + pos.y) / 16) % 2 == 0 ? 255 : 0; // b
+			color.a = 255; // a
+			return color;
+		}, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+
+		entity.AddComponent<Sprite>(core, core, glm::vec2(0.f, -350.f), glm::vec2(200.0f, 200.0f), entt::hashed_string("sprite_example_2"));
+		entity.AddComponent<Name>(core, "Sprite Example 2");
 	});
 
 	core.RunCore();
