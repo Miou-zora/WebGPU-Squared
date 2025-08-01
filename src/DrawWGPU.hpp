@@ -36,6 +36,10 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
 	});
 
+	core.GetRegistry().view<Sprite, Name>().each([&](Sprite &sprite, Name &name) {
+		ImGui::Checkbox(name.value.c_str(), &sprite.enabled);
+	});
+
 	ImGui::BeginChild("Lights");
 	auto &lights = core.GetResource<std::vector<Light>>();
 	for (size_t i = 0; i < lights.size(); ++i) {
@@ -299,6 +303,7 @@ void DrawMeshes(ES::Engine::Core &core)
 	});
 
 	core.GetRegistry().view<Sprite>().each([&](Sprite &sprite) {
+		if (!sprite.enabled) return;
 		DrawSprite(core, sprite);
 	});
 
