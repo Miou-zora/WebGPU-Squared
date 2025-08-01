@@ -120,7 +120,6 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	auto command = commandEncoder.finish(cmdBufferDescriptor);
 	commandEncoder.release();
 
-	// std::cout << "Submitting command..." << std::endl;
 	queue.submit(1, &command);
 	command.release();
 }
@@ -175,7 +174,6 @@ void DrawGui(ES::Engine::Core &core)
 	auto command = commandEncoder.finish(cmdBufferDescriptor);
 	commandEncoder.release();
 
-	// std::cout << "Submitting command..." << std::endl;
 	queue.submit(1, &command);
 	command.release();
 }
@@ -238,7 +236,6 @@ void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
 	auto command = commandEncoder.finish(cmdBufferDescriptor);
 	commandEncoder.release();
 
-	// std::cout << "Submitting command..." << std::endl;
 	queue.submit(1, &command);
 	command.release();
 }

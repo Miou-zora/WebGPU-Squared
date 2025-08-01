@@ -29,9 +29,7 @@
 
 #include "Mesh.hpp"
 #include "utils.hpp"
-#include "RequestAdapterSync.hpp"
 #include "AdaptaterPrint.hpp"
-#include "RequestDeviceSync.hpp"
 #include "InspectDevice.hpp"
 #include "InitBuffers.hpp"
 #include "InitializePipeline.hpp"

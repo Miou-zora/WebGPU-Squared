@@ -6,7 +6,7 @@
 void CreateDevice(ES::Engine::Core &core) {
 	ES::Utils::Log::Info("Creating WebGPU device...");
 
-	const auto &adapter = core.GetResource<wgpu::Adapter>();
+	auto &adapter = core.GetResource<wgpu::Adapter>();
 
 	if (adapter == nullptr) throw std::runtime_error("Adapter is not created, cannot create device.");
 
@@ -27,7 +27,7 @@ void CreateDevice(ES::Engine::Core &core) {
 		ES::Utils::Log::Error(fmt::format("Uncaptured device error: type {:x} ({})", static_cast<uint32_t>(type), toStdStringView(message)));
 	};
 
-	wgpu::Device device = core.RegisterResource(wgpu::Device(RequestDeviceSync(adapter, deviceDesc)));
+	wgpu::Device device = core.RegisterResource(adapter.requestDevice(deviceDesc));
 
 	if (device == nullptr) throw std::runtime_error("Could not create WebGPU device");
 

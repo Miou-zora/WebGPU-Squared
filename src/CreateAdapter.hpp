@@ -15,7 +15,7 @@ void CreateAdapter(ES::Engine::Core &core) {
 	wgpu::RequestAdapterOptions adapterOpts(wgpu::Default);
 	adapterOpts.compatibleSurface = surface;
 
-	wgpu::Adapter adapter = core.RegisterResource(RequestAdapterSync(instance, adapterOpts));
+	wgpu::Adapter adapter = core.RegisterResource(instance.requestAdapter(adapterOpts));
 
 	if (adapter == nullptr) throw std::runtime_error("Could not get WebGPU adapter");
 
