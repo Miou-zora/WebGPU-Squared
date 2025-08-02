@@ -10,6 +10,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	//TODO: Put this in a separate system
 	//TODO: Should we separate this from pipelineData?
 	auto &bindGroups = core.RegisterResource(BindGroups());
+	auto &lights = core.GetResource<std::vector<Light>>();
 
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot create binding group.");
 
@@ -19,17 +20,11 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	binding.buffer = uniformBuffer;
 	binding.size = sizeof(MyUniforms);
 
-	wgpu::BindGroupEntry binding2(wgpu::Default);
-	binding2.binding = 1;
-	binding2.buffer = lightsBuffer;
-	binding2.size = sizeof(Light) * MAX_LIGHTS + sizeof(uint32_t); // TODO: Resize when adding a new light
+	std::array<wgpu::BindGroupEntry, 1> bindings = { binding };
 
-	std::array<wgpu::BindGroupEntry, 2> bindings = { binding, binding2 };
-
-	// A bind group contains one or multiple bindings
 	wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
 	bindGroupDesc.layout = pipelineData.bindGroupLayouts[0];
-	bindGroupDesc.entryCount = 2;
+	bindGroupDesc.entryCount = bindings.size();
 	bindGroupDesc.entries = bindings.data();
 	bindGroupDesc.label = wgpu::StringView("My Bind Group");
 	auto bg1 = device.createBindGroup(bindGroupDesc);
@@ -37,4 +32,22 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	if (bg1 == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
 
 	bindGroups.groups["1"] = bg1;
+
+	wgpu::BindGroupEntry bindingLights(wgpu::Default);
+	bindingLights.binding = 0;
+	bindingLights.buffer = lightsBuffer;
+	bindingLights.size = sizeof(Light) + sizeof(uint32_t) + 12 /* (padding) */; // TODO: Resize when adding a new light
+
+	std::array<wgpu::BindGroupEntry, 1> lightsBindings = { bindingLights };
+
+	wgpu::BindGroupDescriptor bindGroupLightsDesc(wgpu::Default);
+	bindGroupLightsDesc.layout = pipelineData.bindGroupLayouts[1];
+	bindGroupLightsDesc.entryCount = lightsBindings.size();
+	bindGroupLightsDesc.entries = lightsBindings.data();
+	bindGroupLightsDesc.label = wgpu::StringView("Lights Bind Group");
+	auto bg2 = device.createBindGroup(bindGroupLightsDesc);
+
+	if (bg2 == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
+
+	bindGroups.groups["2"] = bg2;
 }

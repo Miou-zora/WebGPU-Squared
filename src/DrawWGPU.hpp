@@ -43,8 +43,10 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	auto &lights = core.GetResource<std::vector<Light>>();
 
 	ImGui::Text("Lights: %zu", lights.size());
+	bool lightsDirty = false;
 	if (ImGui::Button("Clear Lights")) {
 		lights.clear();
+		lightsDirty = true;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Add Light")) {
@@ -55,6 +57,7 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 			.enabled = true,
 			.type = Light::Type::Point
 		});
+		lightsDirty = true;
 	}
 
 	ImGui::BeginChild("Lights", ImVec2(0, 400));
@@ -66,6 +69,7 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::SameLine();
 		if (ImGui::Button("Remove")) {
 			lights.erase(lights.begin() + i);
+			lightsDirty = true;
 			ImGui::PopID();
 			continue;
 		}
@@ -76,6 +80,44 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::PopID();
 	}
 	ImGui::EndChild();
+
+	if (lightsDirty) {
+		auto &device = core.GetResource<wgpu::Device>();
+		auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
+		auto &bindGroups = core.GetResource<BindGroups>();
+		auto &queue = core.GetResource<wgpu::Queue>();
+
+		lightsBuffer.destroy();
+		lightsBuffer.release();
+
+		wgpu::BufferDescriptor lightsBufferDesc(wgpu::Default);
+		lightsBufferDesc.size = sizeof(Light) * std::max(lights.size(), size_t(1)) + sizeof(uint32_t) + 12 /* (padding) */;
+		lightsBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
+		lightsBufferDesc.label = wgpu::StringView("Lights Buffer");
+		lightsBuffer = device.createBuffer(lightsBufferDesc);
+
+		uint32_t lightsCount = static_cast<uint32_t>(lights.size());
+		queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));
+		queue.writeBuffer(lightsBuffer, sizeof(uint32_t), lights.data(), sizeof(Light) * lights.size());
+
+		bindGroups.groups["2"].release();
+
+		wgpu::BindGroupEntry bindingLights(wgpu::Default);
+		bindingLights.binding = 0;
+		bindingLights.buffer = lightsBuffer;
+		bindingLights.size = sizeof(Light) * std::max(lights.size(), size_t(1)) + sizeof(uint32_t) + 12 /* (padding) */; // TODO: Resize when adding a new light
+
+		std::array<wgpu::BindGroupEntry, 1> lightsBindings = { bindingLights };
+
+		wgpu::BindGroupDescriptor bindGroupLightsDesc(wgpu::Default);
+		bindGroupLightsDesc.layout = pipelineData.bindGroupLayouts[1];
+		bindGroupLightsDesc.entryCount = lightsBindings.size();
+		bindGroupLightsDesc.entries = lightsBindings.data();
+		bindGroupLightsDesc.label = wgpu::StringView("Lights Bind Group");
+		auto bg = device.createBindGroup(bindGroupLightsDesc);
+
+		bindGroups.groups["2"] = bg;
+	}
 
 	ImGui::End();
 
@@ -125,8 +167,10 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 
 	// Select which render pipeline to use
 	renderPass.setPipeline(pipelineData.pipeline);
-	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
-	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
+	auto &bindGroup1 = core.GetResource<BindGroups>().groups["1"];
+	renderPass.setBindGroup(0, bindGroup1, 0, nullptr);
+	auto &bindGroupLights = core.GetResource<BindGroups>().groups["2"];
+	renderPass.setBindGroup(1, bindGroupLights, 0, nullptr);
 
 	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
 	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());

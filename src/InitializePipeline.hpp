@@ -49,23 +49,33 @@ void InitializePipeline(ES::Engine::Core &core)
 	bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
 	bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
 
-	WGPUBindGroupLayoutEntry bindingLayout2 = {0};
-	bindingLayout2.binding = 1;
-	bindingLayout2.visibility = wgpu::ShaderStage::Fragment;
-	bindingLayout2.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-	bindingLayout2.buffer.minBindingSize = sizeof(uint32_t) + 12 /* (padding) */ + sizeof(Light);
-
-	std::array<WGPUBindGroupLayoutEntry, 2> bindings = { bindingLayout, bindingLayout2 };
+	std::array<WGPUBindGroupLayoutEntry, 1> bindings = { bindingLayout };
 
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
-	bindGroupLayoutDesc.entryCount = 2;
+	bindGroupLayoutDesc.entryCount = bindings.size();
 	bindGroupLayoutDesc.entries = bindings.data();
 	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
+	WGPUBindGroupLayoutEntry bindingLayoutLights = {0};
+	bindingLayoutLights.binding = 0;
+	bindingLayoutLights.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutLights.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+	bindingLayoutLights.buffer.minBindingSize = sizeof(uint32_t) + 12 /* (padding) */ + sizeof(Light);
+
+	std::array<WGPUBindGroupLayoutEntry, 1> bindingsLights = { bindingLayoutLights };
+
+	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDescLights(wgpu::Default);
+	bindGroupLayoutDescLights.entryCount = bindingsLights.size();
+	bindGroupLayoutDescLights.entries = bindingsLights.data();
+	bindGroupLayoutDescLights.label = wgpu::StringView("Lights Bind Group Layout");
+	wgpu::BindGroupLayout bindGroupLayoutLights = device.createBindGroupLayout(bindGroupLayoutDescLights);
+
+	std::array<WGPUBindGroupLayout, 2> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights};
+
 	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
-	layoutDesc.bindGroupLayoutCount = 1;
-	layoutDesc.bindGroupLayouts = reinterpret_cast<WGPUBindGroupLayout*>(&bindGroupLayout);
+	layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
+	layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
 	wgpu::PipelineLayout layout = device.createPipelineLayout(layoutDesc);
 
     pipelineDesc.vertex.bufferCount = 1;
@@ -108,7 +118,7 @@ void InitializePipeline(ES::Engine::Core &core)
 
 	core.GetResource<Pipelines>().renderPipelines["3D"] = PipelineData{
 		.pipeline = pipeline,
-		.bindGroupLayouts = {bindGroupLayout},
+		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights},
 		.layout = layout,
 	};
 }

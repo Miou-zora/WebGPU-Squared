@@ -8,6 +8,8 @@ void InitializeBuffers(ES::Engine::Core &core)
 {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
+	auto &lights = core.GetResource<std::vector<Light>>();
+
 
 	if (queue == nullptr) throw std::runtime_error("WebGPU queue is not created, cannot initialize buffers.");
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize buffers.");
@@ -18,8 +20,9 @@ void InitializeBuffers(ES::Engine::Core &core)
 	uniformBuffer = device.createBuffer(bufferDesc);
 
 	wgpu::BufferDescriptor lightsBufferDesc(wgpu::Default);
-	lightsBufferDesc.size = sizeof(Light) * MAX_LIGHTS + sizeof(uint32_t);
+	lightsBufferDesc.size = sizeof(Light) + sizeof(uint32_t) + 12 /* (padding) */;
 	lightsBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
+	lightsBufferDesc.label = wgpu::StringView("Lights Buffer");
 	lightsBuffer = device.createBuffer(lightsBufferDesc);
 
 	// Upload the initial value of the uniforms
@@ -32,9 +35,6 @@ void InitializeBuffers(ES::Engine::Core &core)
 	float fov = glm::radians(45.0f);
 	uniforms.projectionMatrix = glm::perspective(fov, ratio, near_value, far_value);
 	queue.writeBuffer(uniformBuffer, 0, &uniforms, sizeof(uniforms));
-
-
-	auto &lights = core.GetResource<std::vector<Light>>();
 
 	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
 	queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));

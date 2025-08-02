@@ -38,7 +38,7 @@ struct Lights {
     lights: array<Light>,
 }
 
-@group(0) @binding(1)
+@group(1) @binding(0)
 var<storage, read> uLights: Lights;
 
 @vertex
