@@ -34,3 +34,9 @@ target(project_name)
     add_includedirs("src/", {public = true})
 
     set_rundir("$(projectdir)")
+
+    -- Enable as many warnings as possible
+    add_cxxflags("-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Wnon-virtual-dtor", "-Wold-style-cast", "-Wcast-align", "-Wunused", "-Woverloaded-virtual", "-Wconversion", "-Wsign-conversion", "-Wmisleading-indentation", "-Wduplicated-cond", "-Wduplicated-branches", "-Wlogical-op", "-Wnull-dereference", "-Wuseless-cast", "-Wdouble-promotion", "-Wformat=2", "-Wno-unused-parameter", {force = true})
+    if is_plat("macosx") then
+        add_cxxflags("-Weverything", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic", {force = true})
+    end
