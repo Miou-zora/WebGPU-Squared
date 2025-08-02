@@ -40,15 +40,38 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::Checkbox(name.value.c_str(), &sprite.enabled);
 	});
 
-	ImGui::BeginChild("Lights");
 	auto &lights = core.GetResource<std::vector<Light>>();
+
+	ImGui::Text("Lights: %zu", lights.size());
+	if (ImGui::Button("Clear Lights")) {
+		lights.clear();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Add Light")) {
+		lights.push_back(Light{
+			.color = { 0.0f, 0.0f, 0.0f, 1.0f },
+			.direction = { 0.0f, 0.0f, 0.0f },
+			.intensity = 0.f,
+			.enabled = true,
+			.type = Light::Type::Point
+		});
+	}
+
+	ImGui::BeginChild("Lights", ImVec2(0, 400));
 	for (size_t i = 0; i < lights.size(); ++i) {
 		ImGui::PushID(i);
 		ImGui::Text("Light %zu", i);
+		ImGui::SameLine();
+		ImGui::Checkbox("Enabled", (bool *)&lights[i].enabled);
+		ImGui::SameLine();
+		if (ImGui::Button("Remove")) {
+			lights.erase(lights.begin() + i);
+			ImGui::PopID();
+			continue;
+		}
 		ImGui::ColorEdit4("Color", glm::value_ptr(lights[i].color));
 		ImGui::DragFloat3("Direction(Directional)/Position(Point)", glm::value_ptr(lights[i].direction), 0.1f);
 		ImGui::DragFloat("Intensity", &lights[i].intensity, 10.f);
-		ImGui::Checkbox("Enabled", (bool *)&lights[i].enabled);
 		ImGui::Combo("Type", (int *)&lights[i].type, "Directional\0Point\0Spot\0");
 		ImGui::PopID();
 	}
@@ -279,8 +302,10 @@ void DrawMeshes(ES::Engine::Core &core)
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, cameraPosition), &uniforms.cameraPosition, sizeof(MyUniforms::cameraPosition));
 
 	auto &lights = core.GetResource<std::vector<Light>>();
+	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
 
-	queue.writeBuffer(lightsBuffer, 0, lights.data(), sizeof(Light) * MAX_LIGHTS);
+	queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));
+	queue.writeBuffer(lightsBuffer, sizeof(uint32_t) + 12 /* (padding) */, lights.data(), sizeof(Light) * lights.size());
 
 	Uniforms2D uniforms2D;
 

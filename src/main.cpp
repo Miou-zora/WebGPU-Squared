@@ -342,6 +342,7 @@ class Plugin : public ES::Engine::APlugin {
 		RegisterResource(ClearColor());
 		RegisterResource(Pipelines());
 		RegisterResource(TextureManager());
+		RegisterResource(std::vector<Light>());
 
 		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
 			CreateInstance,
@@ -480,26 +481,26 @@ auto main(int ac, char **av) -> int
 	[](ES::Engine::Core &core) {
 		auto &lights = core.GetResource<std::vector<Light>>();
 
-		lights.at(0) = {
+		lights.push_back({
 			.color = { 0.8f, 0.2f, 0.2f, 1.0f },
 			.direction = { 200.0f, 100.0f, 0.0f },
 			.intensity = 100.f,
 			.enabled = true
-		};
+		});
 
-		lights.at(1) = {
+		lights.push_back({
 			.color = { 0.1f, 0.9f, 0.3f, 1.0f },
 			.direction = { -300.0f, 100.0f, 0.0f },
 			.intensity = 100.f,
 			.enabled = true
-		};
+		});
 
-		lights.at(2) = {
+		lights.push_back({
 			.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 			.direction = { 0.0f, 100.0f, 300.0f },
 			.intensity = 100.f,
 			.enabled = true
-		};
+		});
 	});
 
 	// TODO: avoid defining the camera data in the main.cpp, use default values

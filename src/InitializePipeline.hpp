@@ -53,7 +53,7 @@ void InitializePipeline(ES::Engine::Core &core)
 	bindingLayout2.binding = 1;
 	bindingLayout2.visibility = wgpu::ShaderStage::Fragment;
 	bindingLayout2.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-	bindingLayout2.buffer.minBindingSize = sizeof(Light) * MAX_LIGHTS;
+	bindingLayout2.buffer.minBindingSize = sizeof(uint32_t) + 12 /* (padding) */ + sizeof(Light);
 
 	std::array<WGPUBindGroupLayoutEntry, 2> bindings = { bindingLayout, bindingLayout2 };
 

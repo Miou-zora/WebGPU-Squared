@@ -22,7 +22,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	wgpu::BindGroupEntry binding2(wgpu::Default);
 	binding2.binding = 1;
 	binding2.buffer = lightsBuffer;
-	binding2.size = sizeof(Light) * MAX_LIGHTS;
+	binding2.size = sizeof(Light) * MAX_LIGHTS + sizeof(uint32_t); // TODO: Resize when adding a new light
 
 	std::array<wgpu::BindGroupEntry, 2> bindings = { binding, binding2 };
 

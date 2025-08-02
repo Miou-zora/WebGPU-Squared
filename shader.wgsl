@@ -33,8 +33,13 @@ const pi = 3.14159265359;
 @group(0) @binding(0)
 var<uniform> uMyUniform: MyUniforms;
 
+struct Lights {
+    numberOfLights: u32,
+    lights: array<Light>,
+}
+
 @group(0) @binding(1)
-var<storage, read> uLights: array<Light>;
+var<storage, read> uLights: Lights;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
@@ -59,8 +64,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let Shiness: f32 = 100.0;
 
 	var color = vec3f(0.0);
-    for (var i = 0u; i < arrayLength(&uLights); i++) {
-        let light = uLights[i];
+    for (var i = 0u; i < uLights.numberOfLights; i++) {
+        let light = uLights.lights[i];
 
         if (light.enabled == 0u) {
             continue; // Skip disabled lights

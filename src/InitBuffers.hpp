@@ -18,7 +18,7 @@ void InitializeBuffers(ES::Engine::Core &core)
 	uniformBuffer = device.createBuffer(bufferDesc);
 
 	wgpu::BufferDescriptor lightsBufferDesc(wgpu::Default);
-	lightsBufferDesc.size = sizeof(Light) * MAX_LIGHTS;
+	lightsBufferDesc.size = sizeof(Light) * MAX_LIGHTS + sizeof(uint32_t);
 	lightsBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
 	lightsBuffer = device.createBuffer(lightsBufferDesc);
 
@@ -33,7 +33,10 @@ void InitializeBuffers(ES::Engine::Core &core)
 	uniforms.projectionMatrix = glm::perspective(fov, ratio, near_value, far_value);
 	queue.writeBuffer(uniformBuffer, 0, &uniforms, sizeof(uniforms));
 
-	auto &lights = core.RegisterResource(std::vector<Light>(MAX_LIGHTS));
 
-	queue.writeBuffer(lightsBuffer, 0, lights.data(), lights.size() * sizeof(Light));
+	auto &lights = core.GetResource<std::vector<Light>>();
+
+	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
+	queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));
+	queue.writeBuffer(lightsBuffer, sizeof(uint32_t), lights.data(), sizeof(Light) * lights.size());
 }
