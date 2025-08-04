@@ -10,7 +10,7 @@
 #include "UpdateLights.hpp"
 
 
-void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
+void RenderGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
     // Start the Dear ImGui frame
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -94,6 +94,24 @@ void UpdateGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
     ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
 }
 
+/*
+This render pass needs:
+- Update all buffers before
+
+- A name (for labels and debugging)
+
+- Output texture view (color attachment)
+	- Load operation (clear or load) for the color attachment
+	- In case of clear:
+		- Clear value for the color attachment
+
+- Depth texture view (depth attachment)
+
+- Pipeline ID
+- Bind groups required by the pipeline (ID of group linked to the group index)
+- Bind vertex, index buffers
+- Draw call (indexed)
+*/
 void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
@@ -117,7 +135,6 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	renderPassColorAttachment.view = textureView;
 	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
 	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
-	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
 
 	renderPassDesc.colorAttachmentCount = 1;
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
@@ -130,7 +147,7 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 
 	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
 
-	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+	wgpu::RenderPassEncoder renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
 	// Select which render pipeline to use
 	renderPass.setPipeline(pipelineData.pipeline);
@@ -158,17 +175,28 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	command.release();
 }
 
+
+/*
+This render pass needs:
+- A name (for labels and debugging)
+
+- Output texture view (color attachment)
+	- Load operation (clear or load) for the color attachment
+	- In case of clear:
+		- Clear value for the color attachment
+
+- Depth texture view (depth attachment)
+
+- Custom Draw call (Core and renderpass required)
+*/
 void DrawGui(ES::Engine::Core &core)
 {
-	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["2D"];
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 
-	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
 	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
 	encoderDesc.label = wgpu::StringView("My command encoder");
 	auto commandEncoder = device.createCommandEncoder(encoderDesc);
-	if (commandEncoder == nullptr) throw std::runtime_error("Command encoder is not created, cannot draw mesh.");
 
 	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
 	renderPassDesc.label = wgpu::StringView("Mesh render pass");
@@ -177,7 +205,6 @@ void DrawGui(ES::Engine::Core &core)
 	renderPassColorAttachment.view = textureView;
 	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
 	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
-	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
 
 	renderPassDesc.colorAttachmentCount = 1;
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
@@ -190,14 +217,9 @@ void DrawGui(ES::Engine::Core &core)
 
 	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
 
-	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+	wgpu::RenderPassEncoder renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
-	// Select which render pipeline to use
-	renderPass.setPipeline(pipelineData.pipeline);
-	auto &bindGroup = core.GetResource<BindGroups>().groups["1"];
-	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
-
-	UpdateGui(renderPass, core);
+	RenderGui(renderPass, core);
 
 	renderPass.end();
 	renderPass.release();
@@ -212,6 +234,25 @@ void DrawGui(ES::Engine::Core &core)
 	command.release();
 }
 
+/*
+This render pass needs:
+- Update all buffers before
+
+- A name (for labels and debugging)
+
+- Output texture view (color attachment)
+	- Load operation (clear or load) for the color attachment
+	- In case of clear:
+		- Clear value for the color attachment
+
+- Depth texture view (depth attachment)
+
+- Pipeline ID
+- Bind groups required by the pipeline (ID of group linked to the group index)
+- Bind groups related to the sprite texture (ID of group linked to the group index)
+- Bind vertex, index buffers
+- Draw call (indexed)
+*/
 void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
 {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
@@ -227,11 +268,11 @@ void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
 	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
 	renderPassDesc.label = wgpu::StringView("Sprite render pass");
 
+	// Target Texture
 	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
 	renderPassColorAttachment.view = textureView;
 	renderPassColorAttachment.loadOp = wgpu::LoadOp::Load;
 	renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
-	renderPassColorAttachment.clearValue = wgpu::Color{ 0.0, 0.0, 0.0, 1.0 };
 
 	renderPassDesc.colorAttachmentCount = 1;
 	renderPassDesc.colorAttachments = &renderPassColorAttachment;
@@ -244,7 +285,7 @@ void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
 
 	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
 
-	renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+	wgpu::RenderPassEncoder renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
 	// Select which render pipeline to use
 	renderPass.setPipeline(pipelineData.pipeline);
@@ -330,6 +371,12 @@ void DrawMeshes(ES::Engine::Core &core)
 
 	queue.writeBuffer(uniform2DBuffer, 0, &uniforms2D, sizeof(Uniforms2D));
 
+	// All of the buffers updates should be done before starting the render pass
+
+	// Two type of layer render passes:
+	// 1. One each entity with required components
+	// 2. One for one call rendering (gui)
+	// One of each layer can have preconditions to be drawn, like enabled or not.
 	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
 		if (!mesh.enabled) return;
 		DrawMesh(core, mesh, transform);

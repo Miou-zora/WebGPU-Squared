@@ -671,6 +671,9 @@ auto main(int ac, char **av) -> int
 		auto &pipelines = core.GetResource<Pipelines>();
 		textureManager.Add(entt::hashed_string("sprite_example_2"), core.GetResource<wgpu::Device>(), glm::uvec2(200, 200), [](glm::uvec2 pos) {
 			glm::u8vec4 color;
+			if (pos.x >= 40 && pos.x <= 160 && pos.y >= 40 && pos.y <= 160) {
+				return glm::u8vec4(0, 0, 0, 0);
+			}
 			color.r = (pos.x / 16) % 2 == (pos.y / 16) % 2 ? 255 : 0; // r
 			color.g = ((pos.x - pos.y) / 16) % 2 == 0 ? 255 : 0; // g
 			color.b = ((pos.x + pos.y) / 16) % 2 == 0 ? 255 : 0; // b

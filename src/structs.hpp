@@ -284,6 +284,5 @@ wgpu::Buffer uniform2DBuffer = nullptr;
 wgpu::Buffer lightsBuffer = nullptr;
 wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 wgpu::Texture textureToRelease = nullptr;
-wgpu::RenderPassEncoder renderPass = nullptr;
 wgpu::TextureView textureView = nullptr;
 wgpu::TextureView depthTextureView = nullptr;

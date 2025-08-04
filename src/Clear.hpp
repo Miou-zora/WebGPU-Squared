@@ -3,15 +3,23 @@
 #include "webgpu.hpp"
 #include "Engine.hpp"
 
+/*
+This render pass needs:
+- A name (for labels and debugging)
+
+- Output texture view (color attachment)
+	- Load operation (clear or load) for the color attachment
+	- In case of clear:
+	- Clear value for the color attachment
+
+- Depth texture view (depth attachment)
+*/
 void Clear(ES::Engine::Core &core) {
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 
 	const ClearColor &clearColor = core.GetResource<ClearColor>();
-
-	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot draw.");
-	if (surface == nullptr) throw std::runtime_error("WebGPU surface is not created, cannot draw.");
 
 	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
 	encoderDesc.label = wgpu::StringView("Clear command encoder");
@@ -37,9 +45,7 @@ void Clear(ES::Engine::Core &core) {
 
 	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
 
-	renderPass = encoder.beginRenderPass(renderPassDesc);
-
-	if (renderPass == nullptr) throw std::runtime_error("Could not create render pass encoder");
+	wgpu::RenderPassEncoder renderPass = encoder.beginRenderPass(renderPassDesc);
 
 	renderPass.end();
 	renderPass.release();
