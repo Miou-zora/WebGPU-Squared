@@ -15,7 +15,7 @@ void onResize(GLFWwindow* window, int width, int height) {
 	TerminateDepthBuffer(*core);
 	UnconfigureSurface(*core);
 
-	ConfigureSurface(*core);
+	ES::Plugin::WebGPU::System::ConfigureSurface(*core);
 	InitDepthBuffer(*core);
 
 	auto &cameraData = core->GetResource<CameraData>();

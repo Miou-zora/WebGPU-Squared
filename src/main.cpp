@@ -45,7 +45,6 @@
 #include "ReleaseAdapter.hpp"
 #include "CreateBindingGroup.hpp"
 #include "GetNextSurfaceViewData.hpp"
-#include "Clear.hpp"
 #include "DrawWGPU.hpp"
 #include "ReleasePipeline.hpp"
 #include "ReleaseBuffers.hpp"
@@ -470,16 +469,16 @@ class Plugin : public ES::Engine::APlugin {
 			CreateSurface,
 			CreateAdapter,
 #if defined(ES_DEBUG)
-			AdaptaterPrintLimits,
-			AdaptaterPrintFeatures,
-			AdaptaterPrintProperties,
+			System::AdaptaterPrintLimits,
+			System::AdaptaterPrintFeatures,
+			System::AdaptaterPrintProperties,
 #endif
 			ReleaseInstance,
 			RequestCapabilities,
 			CreateDevice,
 			CreateQueue,
 			SetupQueueOnSubmittedWorkDone,
-			ConfigureSurface,
+			System::ConfigureSurface,
 			ReleaseAdapter,
 #if defined(ES_DEBUG)
 			InspectDevice,

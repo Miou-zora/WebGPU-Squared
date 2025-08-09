@@ -1,7 +1,10 @@
-#pragma once
+#include "AdaptaterPrint.hpp"
 
-#include <webgpu/webgpu.h>
+#include "webgpu.hpp"
+#include "utils.hpp"
 #include "Engine.hpp"
+
+namespace ES::Plugin::WebGPU::System {
 
 void AdaptaterPrintLimits(ES::Engine::Core &core)
 {
@@ -59,4 +62,6 @@ void AdaptaterPrintProperties(ES::Engine::Core &core)
 	ES::Utils::Log::Info(fmt::format(" - backendType: 0x{:x}", static_cast<uint32_t>(properties.backendType)));
 
 	properties.freeMembers();
+}
+
 }

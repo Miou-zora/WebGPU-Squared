@@ -1,9 +1,10 @@
-#pragma once
 
-#include <webgpu/webgpu.h>
+#include "ConfigureSurface.hpp"
+#include "webgpu.hpp"
 #include "Engine.hpp"
+#include "Window.hpp"
 
-void ConfigureSurface(ES::Engine::Core &core) {
+void ES::Plugin::WebGPU::System::ConfigureSurface(ES::Engine::Core &core) {
 
 	const auto &device = core.GetResource<wgpu::Device>();
 	const auto &surface = core.GetResource<wgpu::Surface>();
