@@ -1,7 +1,9 @@
-#pragma once
+#include "CreateSurface.hpp"
+#include "webgpu.hpp"
+#include "Window.hpp"
+#include <glfw3webgpu.h>
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void CreateSurface(ES::Engine::Core &core) {
 	ES::Utils::Log::Debug("Creating surface...");
@@ -16,4 +18,6 @@ void CreateSurface(ES::Engine::Core &core) {
 	if (surface == nullptr) throw std::runtime_error("Could not create surface");
 
 	ES::Utils::Log::Debug(fmt::format("Surface created: {}", static_cast<void*>(surface)));
+}
+
 }

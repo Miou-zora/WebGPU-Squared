@@ -1,7 +1,7 @@
-#pragma once
+#include "CreateQueue.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void CreateQueue(ES::Engine::Core &core) {
 	ES::Utils::Log::Debug("Creating WebGPU queue...");
@@ -15,4 +15,6 @@ void CreateQueue(ES::Engine::Core &core) {
 	if (queue == nullptr) throw std::runtime_error("Could not create WebGPU queue");
 
 	ES::Utils::Log::Debug(fmt::format("WebGPU queue created: {}", static_cast<void*>(queue)));
+}
+
 }

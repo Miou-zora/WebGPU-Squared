@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine.hpp"
+#include "Core.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 	void AdaptaterPrintLimits(ES::Engine::Core &core);

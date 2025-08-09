@@ -1,8 +1,8 @@
-#pragma once
+#include "CreateBindingGroup.hpp"
+#include "webgpu.hpp"
+#include "structs.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
-
+namespace ES::Plugin::WebGPU::System {
 void CreateBindingGroup(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
@@ -50,4 +50,5 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	if (bg2 == nullptr) throw std::runtime_error("Could not create WebGPU bind group");
 
 	bindGroups.groups["2"] = bg2;
+}
 }

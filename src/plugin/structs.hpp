@@ -1,8 +1,11 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <webgpu/webgpu.h>
+#include "webgpu.hpp"
+#include "Object.hpp"
+#include <filesystem>
 
+#include "stb_image.h"
 
 struct MyUniforms {
 	glm::mat4x4 projectionMatrix;
@@ -281,10 +284,31 @@ struct Uniforms2D {
 
 constexpr size_t MAX_LIGHTS = 16;
 
-wgpu::Buffer uniformBuffer = nullptr;
-wgpu::Buffer uniform2DBuffer = nullptr;
-wgpu::Buffer lightsBuffer = nullptr;
-wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
-wgpu::Texture textureToRelease = nullptr;
-wgpu::TextureView textureView = nullptr;
-wgpu::TextureView depthTextureView = nullptr;
+inline wgpu::Buffer uniformBuffer = nullptr;
+inline wgpu::Buffer uniform2DBuffer = nullptr;
+inline wgpu::Buffer lightsBuffer = nullptr;
+inline wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
+inline wgpu::Texture textureToRelease = nullptr;
+inline wgpu::TextureView textureView = nullptr;
+inline wgpu::TextureView depthTextureView = nullptr;
+
+struct BindGroupsLinks {
+	enum class AssetType {
+		BindGroup, // often used for pur data like uniforms
+		TextureView,
+	} type;
+	std::string name; // In case of usage global
+	uint32_t groupIndex; // Index of the bind group in the pipeline
+};
+
+struct RenderPassData {
+	std::string name;
+	std::optional<std::string> pipelineName;
+	wgpu::LoadOp loadOp = wgpu::LoadOp::Load;
+	std::optional<std::function<glm::vec4(ES::Engine::Core &)>> clearColor; // 0 to 1 range, nullptr if load operation is not clear
+	std::string outputColorTextureName;
+	std::string outputDepthTextureName;
+	std::vector<BindGroupsLinks> bindGroups;
+	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core)>> uniqueRenderCallback = std::nullopt;
+	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, Mesh &, ES::Plugin::Object::Component::Transform &, ES::Engine::Entity)>> perEntityCallback;
+};

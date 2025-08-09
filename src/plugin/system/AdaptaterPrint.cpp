@@ -2,7 +2,6 @@
 
 #include "webgpu.hpp"
 #include "utils.hpp"
-#include "Engine.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 

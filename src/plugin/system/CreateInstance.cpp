@@ -1,7 +1,7 @@
-#pragma once
+#include "CreateInstance.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void CreateInstance(ES::Engine::Core &core) {
 	ES::Utils::Log::Debug("Creating WebGPU instance...");
@@ -13,4 +13,5 @@ void CreateInstance(ES::Engine::Core &core) {
 	if (instance == nullptr) throw std::runtime_error("Could not create WebGPU instance");
 
 	ES::Utils::Log::Debug(fmt::format("WebGPU instance created: {}", static_cast<void*>(instance)));
+}
 }

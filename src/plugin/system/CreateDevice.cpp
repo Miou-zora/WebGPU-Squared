@@ -1,7 +1,8 @@
-#pragma once
+#include "CreateDevice.hpp"
+#include "webgpu.hpp"
+#include "utils.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void CreateDevice(ES::Engine::Core &core) {
 	ES::Utils::Log::Debug("Creating WebGPU device...");
@@ -32,4 +33,5 @@ void CreateDevice(ES::Engine::Core &core) {
 	if (device == nullptr) throw std::runtime_error("Could not create WebGPU device");
 
 	ES::Utils::Log::Debug(fmt::format("WebGPU device created: {}", static_cast<void*>(device)));
+}
 }

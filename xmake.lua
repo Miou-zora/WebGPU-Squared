@@ -33,6 +33,7 @@ target(project_name)
     add_headerfiles("src/**.hpp", { public = true })
     add_includedirs("src/", {public = true})
     add_includedirs("src/plugin", {public = true})
+    add_includedirs("src/plugin/system", {public = true})
 
     set_rundir("$(projectdir)")
 

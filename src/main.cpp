@@ -2,12 +2,9 @@
 #define GLM_FORCE_LEFT_HANDED
 #include <glm/ext.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 #define WEBGPU_CPP_IMPLEMENTATION
 #include "webgpu.hpp"
-#include <glfw3webgpu.h>
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -22,6 +19,8 @@
 #include <GLFW/glfw3.h>
 #include "RenderingPipeline.hpp"
 #include "structs.hpp"
+
+#define STB_IMAGE_IMPLEMENTATION
 
 #include <imgui.h>
 #include <backends/imgui_impl_wgpu.h>
@@ -419,21 +418,25 @@ void CustomRenderPass(ES::Engine::Core &core, RenderPassData renderPassData)
 		}
 	}
 
-	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-		if (!mesh.enabled || mesh.pipelineName != renderPassData.pipelineName) return;
+	if (renderPassData.uniqueRenderCallback.has_value()) {
+		renderPassData.uniqueRenderCallback.value()(renderPass, core);
+	} else {
+		core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+			if (!mesh.enabled || mesh.pipelineName != renderPassData.pipelineName) return;
 
-		const auto &transformMatrix = transform.getTransformationMatrix();
-		queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
+			const auto &transformMatrix = transform.getTransformationMatrix();
+			queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
 
-		if (renderPassData.perEntityCallback.has_value()) {
-			renderPassData.perEntityCallback.value()(renderPass, core, mesh, transform, ES::Engine::Entity(e));
-		}
+			if (renderPassData.perEntityCallback.has_value()) {
+				renderPassData.perEntityCallback.value()(renderPass, core, mesh, transform, ES::Engine::Entity(e));
+			}
 
-		renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
-		renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
+			renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
+			renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
 
-		renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
-	});
+			renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+		});
+	}
 
 
 	renderPass.end();
@@ -465,9 +468,9 @@ class Plugin : public ES::Engine::APlugin {
 		RegisterResource(std::vector<Light>());
 
 		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
-			CreateInstance,
-			CreateSurface,
-			CreateAdapter,
+			System::CreateInstance,
+			System::CreateSurface,
+			System::CreateAdapter,
 #if defined(ES_DEBUG)
 			System::AdaptaterPrintLimits,
 			System::AdaptaterPrintFeatures,
@@ -475,8 +478,8 @@ class Plugin : public ES::Engine::APlugin {
 #endif
 			ReleaseInstance,
 			RequestCapabilities,
-			CreateDevice,
-			CreateQueue,
+			System::CreateDevice,
+			System::CreateQueue,
 			SetupQueueOnSubmittedWorkDone,
 			System::ConfigureSurface,
 			ReleaseAdapter,
@@ -488,7 +491,7 @@ class Plugin : public ES::Engine::APlugin {
 			Initialize2DPipeline,
 			InitializeBuffers,
 			Create2DPipelineBuffer,
-			CreateBindingGroup,
+			System::CreateBindingGroup,
 			CreateBindingGroup2D,
 			SetupResizableWindow,
 			[](ES::Engine::Core &core) {
@@ -604,6 +607,20 @@ class Plugin : public ES::Engine::APlugin {
 				info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
 				info.Device = core.GetResource<wgpu::Device>();
 				ImGui_ImplWGPU_Init(&info);
+			}
+		);
+
+		RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
+			[](ES::Engine::Core &core) {
+				CustomRenderPass(core,
+					RenderPassData{
+						.name = "GUIRenderPass",
+						.outputColorTextureName = "WindowColorTexture",
+						.outputDepthTextureName = "WindowDepthTexture",
+						.loadOp = wgpu::LoadOp::Load,
+						.uniqueRenderCallback = RenderGui
+					}
+				);
 			}
 		);
 	}
@@ -757,10 +774,6 @@ auto main(int ac, char **av) -> int
 		.scrollSensitivity = 0.1f
 	});
 
-	core.RegisterSystem<ES::Plugin::RenderingPipeline::ToGPU>(
-		DrawGui
-	);
-
 	core.RegisterSystem(MovementSystem,
 	[](ES::Engine::Core &core) {
 		auto &cameraData = core.GetResource<CameraData>();
@@ -805,7 +818,7 @@ auto main(int ac, char **av) -> int
 			}
 
 			ImGuiIO& io = ImGui::GetIO();
-			if (io.WantCaptureMouse) {
+			if (io.WantCaptureKeyboard) {
 				ImGui_ImplGlfw_KeyCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), key, scancode, action, mods);
 				return;
 			}

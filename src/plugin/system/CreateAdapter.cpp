@@ -1,7 +1,7 @@
-#pragma once
+#include "CreateAdapter.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void CreateAdapter(ES::Engine::Core &core) {
 	ES::Utils::Log::Debug("Requesting adapter...");
@@ -19,4 +19,6 @@ void CreateAdapter(ES::Engine::Core &core) {
 
 	if (adapter == nullptr) throw std::runtime_error("Could not get WebGPU adapter");
 	ES::Utils::Log::Debug(fmt::format("Got adapter: {}", static_cast<void*>(adapter)));
+}
+
 }
