@@ -1,16 +1,15 @@
-#pragma once
-
-#include "webgpu.hpp"
-#include "Engine.hpp"
+#include "RenderGUI.hpp"
 #include "structs.hpp"
 #include "Sprite.hpp"
 #include <imgui.h>
 #include <backends/imgui_impl_wgpu.h>
 #include <backends/imgui_impl_glfw.h>
 #include "UpdateLights.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
+namespace ES::Plugin::ImGUI::WebGPU::System {
 
-void RenderGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
+void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
     // Start the Dear ImGui frame
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -83,7 +82,7 @@ void RenderGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	ImGui::EndChild();
 
 	if (lightsDirty) {
-		UpdateLights(core);
+		ES::Plugin::WebGPU::Utils::UpdateLights(core);
 	}
 
 	ImGui::End();
@@ -93,60 +92,4 @@ void RenderGui(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
     ImGui::Render();
     ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
 }
-
-void DrawMeshes(ES::Engine::Core &core)
-{
-	wgpu::Device &device = core.GetResource<wgpu::Device>();
-	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
-	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
-	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-
-	MyUniforms uniforms;
-
-	uniforms.time = glfwGetTime();
-	uniforms.color = { 1.f, 1.0f, 1.0f, 1.0f };
-
-	CameraData cameraData = core.GetResource<CameraData>();
-	uniforms.viewMatrix = glm::lookAt(
-		cameraData.position,
-		cameraData.position + glm::vec3(
-			glm::cos(cameraData.yaw) * glm::cos(cameraData.pitch),
-			glm::sin(cameraData.pitch),
-			glm::sin(cameraData.yaw) * glm::cos(cameraData.pitch)
-		),
-		cameraData.up
-	);
-
-	uniforms.projectionMatrix = glm::perspective(
-		cameraData.fovY,
-		cameraData.aspectRatio,
-		cameraData.nearPlane,
-		cameraData.farPlane
-	);
-
-	uniforms.cameraPosition = cameraData.position;
-
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, time), &uniforms.time, sizeof(MyUniforms::time));
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, color), &uniforms.color, sizeof(MyUniforms::color));
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, viewMatrix), &uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, cameraPosition), &uniforms.cameraPosition, sizeof(MyUniforms::cameraPosition));
-
-	auto &lights = core.GetResource<std::vector<Light>>();
-	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
-
-	queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));
-	queue.writeBuffer(lightsBuffer, sizeof(uint32_t) + 12 /* (padding) */, lights.data(), sizeof(Light) * lights.size());
-
-	Uniforms2D uniforms2D;
-
-	glm::ivec2 windowSize = window.GetSize();
-
-	uniforms2D.orthoMatrix = glm::ortho(
-		windowSize.x * -0.5f,
-		windowSize.x * 0.5f,
-		windowSize.y * -0.5f,
-		windowSize.y * 0.5f);
-
-	queue.writeBuffer(uniform2DBuffer, 0, &uniforms2D, sizeof(Uniforms2D));
 }

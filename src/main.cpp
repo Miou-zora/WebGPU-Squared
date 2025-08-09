@@ -44,7 +44,8 @@
 #include "ReleaseAdapter.hpp"
 #include "CreateBindingGroup.hpp"
 #include "GetNextSurfaceViewData.hpp"
-#include "DrawWGPU.hpp"
+#include "RenderGUI.hpp"
+#include "UpdateBuffers.hpp"
 #include "ReleasePipeline.hpp"
 #include "ReleaseBuffers.hpp"
 #include "ReleaseDevice.hpp"
@@ -56,6 +57,7 @@
 #include "InitDepthBuffer.hpp"
 #include "UnconfigureSurface.hpp"
 #include "SetupResizableWindow.hpp"
+#include "UpdateLights.hpp"
 
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
@@ -313,35 +315,6 @@ void GenerateSurfaceTexture(ES::Engine::Core &core)
 	}
 }
 
-// std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
-// 	for (uint32_t i = 0; i < textureDesc.size.width; ++i) {
-// 		for (uint32_t j = 0; j < textureDesc.size.height; ++j) {
-// 			uint8_t *p = &pixels[4 * (j * textureDesc.size.width + i)];
-// 			glm::u8vec4 color = callback(glm::uvec2(i, j));
-// 			p[0] = color.r;
-// 			p[1] = color.g;
-// 			p[2] = color.b;
-// 			p[3] = color.a;
-// 		}
-// 	}
-
-// 	writeMipMaps(device, texture, textureDesc.size, textureDesc.mipLevelCount, pixels.data());
-
-// void GenerateTexture(ES::Engine::Core &core)
-// {
-// 	auto &device = core.GetResource<wgpu::Device>();
-
-	// CreateTexture(device, { 284, 372 }, [](glm::uvec2 pos) {
-	// 	glm::u8vec4 color;
-	// 	color.r = (pos.x / 16) % 2 == (pos.y / 16) % 2 ? 255 : 0; // r
-	// 	color.g = ((pos.x - pos.y) / 16) % 2 == 0 ? 255 : 0; // g
-	// 	color.b = ((pos.x + pos.y) / 16) % 2 == 0 ? 255 : 0; // b
-	// 	color.a = 255; // a
-	// 	return color;
-	// });
-// }
-
-
 void CustomRenderPass(ES::Engine::Core &core, RenderPassData renderPassData)
 {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
@@ -499,7 +472,7 @@ class Plugin : public ES::Engine::APlugin {
 			}
 		);
 		RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
-			DrawMeshes,
+			System::UpdateBuffers,
 			GenerateSurfaceTexture,
 			[](ES::Engine::Core &core) {
 				CustomRenderPass(core,
@@ -618,7 +591,7 @@ class Plugin : public ES::Engine::APlugin {
 						.outputColorTextureName = "WindowColorTexture",
 						.outputDepthTextureName = "WindowDepthTexture",
 						.loadOp = wgpu::LoadOp::Load,
-						.uniqueRenderCallback = RenderGui
+						.uniqueRenderCallback = System::RenderGUI
 					}
 				);
 			}
@@ -638,12 +611,11 @@ static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
     if (inputManager.IsKeyPressed(GLFW_KEY_S)) {
         force.z -= 1.0f;
     }
-	//TODO: check why X axis is inverted
     if (inputManager.IsKeyPressed(GLFW_KEY_A)) {
-        force.x += 1.0f;
+        force.x -= 1.0f;
     }
     if (inputManager.IsKeyPressed(GLFW_KEY_D)) {
-        force.x -= 1.0f;
+        force.x += 1.0f;
     }
 	if (inputManager.IsKeyPressed(GLFW_KEY_SPACE)) {
 		force.y += 1.0f;
@@ -750,7 +722,7 @@ auto main(int ac, char **av) -> int
 			.enabled = true
 		});
 
-		UpdateLights(core);
+		ES::Plugin::WebGPU::Utils::UpdateLights(core);
 	});
 
 	// TODO: avoid defining the camera data in the main.cpp, use default values
@@ -847,7 +819,7 @@ auto main(int ac, char **av) -> int
 				case GLFW_PRESS:
 					if (io.WantCaptureMouse) return;
 					drag.active = true;
-					drag.startMouse = glm::vec2(-mousePos.x, -window.GetSize().y+mousePos.y);
+					drag.startMouse = glm::vec2(mousePos.x, -window.GetSize().y+mousePos.y);
 					drag.originYaw = cameraData.yaw;
 					drag.originPitch = cameraData.pitch;
 					break;
@@ -863,7 +835,7 @@ auto main(int ac, char **av) -> int
 			auto &drag = core.GetResource<DragState>();
 
 			if (drag.active) {
-				glm::vec2 currentMouse = glm::vec2(-(float)x, -(float)y);
+				glm::vec2 currentMouse = glm::vec2((float)x, -(float)y);
 				glm::vec2 delta = (currentMouse - drag.startMouse) * drag.sensitivity;
 				cameraData.yaw = drag.originYaw + delta.x;
 				cameraData.pitch = drag.originPitch + delta.y;
