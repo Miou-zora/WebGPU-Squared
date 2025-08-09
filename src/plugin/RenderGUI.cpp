@@ -7,7 +7,7 @@
 #include "UpdateLights.hpp"
 #include <glm/gtc/type_ptr.hpp>
 
-namespace ES::Plugin::ImGUI::WebGPU::System {
+namespace ES::Plugin::ImGUI::WebGPU::Util {
 
 void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
     // Start the Dear ImGui frame
@@ -36,9 +36,7 @@ void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
 	});
 
-	core.GetRegistry().view<Sprite, Name>().each([&](Sprite &sprite, Name &name) {
-		ImGui::Checkbox(name.value.c_str(), &sprite.enabled);
-	});
+
 
 	auto &lights = core.GetResource<std::vector<Light>>();
 

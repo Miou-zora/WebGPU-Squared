@@ -449,11 +449,11 @@ class Plugin : public ES::Engine::APlugin {
 			System::AdaptaterPrintFeatures,
 			System::AdaptaterPrintProperties,
 #endif
-			ReleaseInstance,
-			RequestCapabilities,
+			System::ReleaseInstance,
+			System::RequestCapabilities,
 			System::CreateDevice,
 			System::CreateQueue,
-			SetupQueueOnSubmittedWorkDone,
+			System::SetupQueueOnSubmittedWorkDone,
 			System::ConfigureSurface,
 			System::ReleaseAdapter,
 #if defined(ES_DEBUG)
@@ -466,7 +466,7 @@ class Plugin : public ES::Engine::APlugin {
 			Create2DPipelineBuffer,
 			System::CreateBindingGroup,
 			CreateBindingGroup2D,
-			SetupResizableWindow,
+			System::SetupResizableWindow,
 			[](ES::Engine::Core &core) {
 				stbi_set_flip_vertically_on_load(true);
 			}
@@ -540,12 +540,13 @@ class Plugin : public ES::Engine::APlugin {
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
 			System::ReleaseBindingGroup,
-			ReleaseUniforms,
+			System::ReleaseUniforms,
 			System::ReleaseBuffers,
-			TerminateDepthBuffer,
+			System::TerminateDepthBuffer,
+			System::ReleasePipeline,
 			System::ReleaseDevice,
-			ReleaseSurface,
-			ReleaseQueue
+			System::ReleaseSurface,
+			System::ReleaseQueue
 		);
 	}
 };
@@ -591,7 +592,7 @@ class Plugin : public ES::Engine::APlugin {
 						.outputColorTextureName = "WindowColorTexture",
 						.outputDepthTextureName = "WindowDepthTexture",
 						.loadOp = wgpu::LoadOp::Load,
-						.uniqueRenderCallback = System::RenderGUI
+						.uniqueRenderCallback = Util::RenderGUI
 					}
 				);
 			}

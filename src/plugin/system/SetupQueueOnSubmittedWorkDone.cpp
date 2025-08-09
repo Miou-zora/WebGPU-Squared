@@ -1,7 +1,7 @@
-#pragma once
+#include "SetupQueueOnSubmittedWorkDone.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void SetupQueueOnSubmittedWorkDone(ES::Engine::Core &core)
 {
@@ -12,5 +12,6 @@ void SetupQueueOnSubmittedWorkDone(ES::Engine::Core &core)
 	};
 	wgpu::QueueWorkDoneCallbackInfo callbackInfo(wgpu::Default);
 	callbackInfo.callback = onQueueWorkDone;
-	wgpuQueueOnSubmittedWorkDone(queue, callbackInfo);
+	queue.onSubmittedWorkDone(callbackInfo);
+}
 }

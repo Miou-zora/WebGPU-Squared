@@ -1,8 +1,7 @@
-#pragma once
+#include "RequestCapabilities.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
-
+namespace ES::Plugin::WebGPU::System {
 void RequestCapabilities(ES::Engine::Core &core)
 {
 	const auto &adapter = core.GetResource<wgpu::Adapter>();
@@ -16,4 +15,5 @@ void RequestCapabilities(ES::Engine::Core &core)
 	surface.getCapabilities(adapter, &capabilities);
 
 	core.RegisterResource(std::move(capabilities));
+}
 }

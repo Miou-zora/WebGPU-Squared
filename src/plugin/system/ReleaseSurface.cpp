@@ -1,8 +1,7 @@
-#pragma once
-
-#include "Engine.hpp"
+#include "ReleaseSurface.hpp"
 #include "webgpu.hpp"
 
+namespace ES::Plugin::WebGPU::System {
 void ReleaseSurface(ES::Engine::Core &core)
 {
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
@@ -12,4 +11,5 @@ void ReleaseSurface(ES::Engine::Core &core)
 		surface.release();
 		surface = nullptr;
 	}
+}
 }

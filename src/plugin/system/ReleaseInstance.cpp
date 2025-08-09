@@ -1,7 +1,7 @@
-#pragma once
+#include "webgpu.hpp"
+#include "ReleaseInstance.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void ReleaseInstance(ES::Engine::Core &core) {
 	wgpu::Instance &instance = core.GetResource<wgpu::Instance>();
@@ -13,4 +13,5 @@ void ReleaseInstance(ES::Engine::Core &core) {
 	instance.release();
 	instance = nullptr;
 	// TODO: Remove the instance from the core resources (#252)
+}
 }

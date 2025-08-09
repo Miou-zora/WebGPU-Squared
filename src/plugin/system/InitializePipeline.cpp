@@ -122,7 +122,7 @@ void InitializePipeline(ES::Engine::Core &core)
 
 	if (pipeline == nullptr) throw std::runtime_error("Could not create render pipeline");
 
-	wgpuShaderModuleRelease(shaderModule);
+	shaderModule.release();
 
 	core.GetResource<Pipelines>().renderPipelines["3D"] = PipelineData{
 		.pipeline = pipeline,

@@ -1,12 +1,12 @@
-#pragma once
+#include "ReleaseUniforms.hpp"
+#include "structs.hpp"
 
-#include "Engine.hpp"
-#include "webgpu.hpp"
-
+namespace ES::Plugin::WebGPU::System {
 void ReleaseUniforms(ES::Engine::Core &core)
 {
 	if (uniformBuffer) {
 		uniformBuffer.release();
 		uniformBuffer = nullptr;
 	}
+}
 }

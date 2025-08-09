@@ -1,7 +1,7 @@
-#pragma once
-
-#include "Engine.hpp"
+#include "ReleaseQueue.hpp"
 #include "webgpu.hpp"
+
+namespace ES::Plugin::WebGPU::System {
 
 void ReleaseQueue(ES::Engine::Core &core)
 {
@@ -11,4 +11,5 @@ void ReleaseQueue(ES::Engine::Core &core)
 		queue.release();
 		queue = nullptr;
 	}
+}
 }
