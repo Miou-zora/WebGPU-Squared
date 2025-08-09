@@ -301,7 +301,7 @@ void CreateBindingGroup2D(ES::Engine::Core &core)
 void GenerateSurfaceTexture(ES::Engine::Core &core)
 {
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
-	textureView = GetNextSurfaceViewData(surface);
+	textureView = ES::Plugin::WebGPU::Util::GetNextSurfaceViewData(surface);
 	if (textureView == nullptr) throw std::runtime_error("Could not get next surface texture view");
 
 	Texture texture;
@@ -394,7 +394,7 @@ void CustomRenderPass(ES::Engine::Core &core, RenderPassData renderPassData)
 	if (renderPassData.uniqueRenderCallback.has_value()) {
 		renderPassData.uniqueRenderCallback.value()(renderPass, core);
 	} else {
-		core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+		core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
 			if (!mesh.enabled || mesh.pipelineName != renderPassData.pipelineName) return;
 
 			const auto &transformMatrix = transform.getTransformationMatrix();
@@ -455,14 +455,14 @@ class Plugin : public ES::Engine::APlugin {
 			System::CreateQueue,
 			SetupQueueOnSubmittedWorkDone,
 			System::ConfigureSurface,
-			ReleaseAdapter,
+			System::ReleaseAdapter,
 #if defined(ES_DEBUG)
-			InspectDevice,
+			System::InspectDevice,
 #endif
-			InitDepthBuffer,
-			InitializePipeline,
+			System::InitDepthBuffer,
+			System::InitializePipeline,
 			Initialize2DPipeline,
-			InitializeBuffers,
+			System::InitializeBuffers,
 			Create2DPipelineBuffer,
 			System::CreateBindingGroup,
 			CreateBindingGroup2D,
@@ -519,7 +519,7 @@ class Plugin : public ES::Engine::APlugin {
 							{ .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
 						},
 						.pipelineName = "2D",
-						.perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
+						.perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
 							auto &textures = core.GetResource<TextureManager>();
 							auto texture = textures.Get(mesh.textures[0]);
 							renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
@@ -539,11 +539,11 @@ class Plugin : public ES::Engine::APlugin {
 			}
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
-			ReleaseBindingGroup,
+			System::ReleaseBindingGroup,
 			ReleaseUniforms,
-			ReleaseBuffers,
+			System::ReleaseBuffers,
 			TerminateDepthBuffer,
-			ReleaseDevice,
+			System::ReleaseDevice,
 			ReleaseSurface,
 			ReleaseQueue
 		);
@@ -856,7 +856,7 @@ auto main(int ac, char **av) -> int
 		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/sponza.obj", vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Model cant be loaded");
 
-		entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices).pipelineName = "3D";
+		entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices).pipelineName = "3D";
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Sponza");
 	},
@@ -871,7 +871,7 @@ auto main(int ac, char **av) -> int
 		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Model cant be loaded");
 
-		entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices).pipelineName = "3D";
+		entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices).pipelineName = "3D";
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Finish");
 	},
@@ -890,7 +890,7 @@ auto main(int ac, char **av) -> int
 		bool success = CreateSprite(glm::vec2(-50.f, -100.f), glm::vec2(284.0f, 372.0f), vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Sprite cant be loaded");
 
-		auto &mesh = entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices);
+		auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 		mesh.pipelineName = "2D";
 		mesh.textures.push_back(entt::hashed_string("sprite_example"));
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
@@ -921,7 +921,7 @@ auto main(int ac, char **av) -> int
 		bool success = CreateSprite(glm::vec2(0.f, -350.f), glm::vec2(200.0f, 200.0f), vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Sprite cant be loaded");
 
-		auto &mesh = entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices);
+		auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 		mesh.pipelineName = "2D";
 		mesh.textures.push_back(entt::hashed_string("sprite_example_2"));
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));

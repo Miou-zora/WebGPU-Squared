@@ -16,7 +16,7 @@ void onResize(GLFWwindow* window, int width, int height) {
 	UnconfigureSurface(*core);
 
 	ES::Plugin::WebGPU::System::ConfigureSurface(*core);
-	InitDepthBuffer(*core);
+	ES::Plugin::WebGPU::System::InitDepthBuffer(*core);
 
 	auto &cameraData = core->GetResource<CameraData>();
 	cameraData.aspectRatio = static_cast<float>(width) / static_cast<float>(height);

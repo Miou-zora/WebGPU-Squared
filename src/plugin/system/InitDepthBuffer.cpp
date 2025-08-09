@@ -1,7 +1,9 @@
-#pragma once
-
+#include "InitDepthBuffer.hpp"
 #include "webgpu.hpp"
-#include "Engine.hpp"
+#include "Window.hpp"
+#include "structs.hpp"
+
+namespace ES::Plugin::WebGPU::System {
 
 void InitDepthBuffer(ES::Engine::Core &core) {
 	auto &device = core.GetResource<wgpu::Device>();
@@ -26,4 +28,5 @@ void InitDepthBuffer(ES::Engine::Core &core) {
 
 	core.GetResource<TextureManager>().Add("WindowDepthTexture", depthTextureViewData);
 	depthTexture.release();
+}
 }

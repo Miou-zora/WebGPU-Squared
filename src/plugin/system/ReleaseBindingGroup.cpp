@@ -1,7 +1,7 @@
-#pragma once
+#include "ReleaseBindingGroup.hpp"
+#include "structs.hpp"
 
-#include "webgpu.hpp"
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void ReleaseBindingGroup(ES::Engine::Core &core)
 {
@@ -13,4 +13,5 @@ void ReleaseBindingGroup(ES::Engine::Core &core)
 			bindGroup = nullptr;
 		}
 	}
+}
 }

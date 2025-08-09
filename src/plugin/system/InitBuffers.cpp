@@ -1,9 +1,8 @@
-#pragma once
-
 #include "structs.hpp"
 #include "Engine.hpp"
 
 
+namespace ES::Plugin::WebGPU::System {
 void InitializeBuffers(ES::Engine::Core &core)
 {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
@@ -39,4 +38,5 @@ void InitializeBuffers(ES::Engine::Core &core)
 	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
 	queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));
 	queue.writeBuffer(lightsBuffer, sizeof(uint32_t), lights.data(), sizeof(Light) * lights.size());
+}
 }

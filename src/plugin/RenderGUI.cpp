@@ -32,7 +32,7 @@ void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	ImGuiIO& io = ImGui::GetIO();
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
-	core.GetRegistry().view<Mesh, Name>().each([&](Mesh &mesh, Name &name) {
+	core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, Name>().each([&](ES::Plugin::WebGPU::Component::Mesh &mesh, Name &name) {
 		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
 	});
 

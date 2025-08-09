@@ -1,7 +1,7 @@
-#pragma once
+#include "GetNextSurfaceViewData.hpp"
+#include "structs.hpp"
 
-#include "webgpu.hpp"
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::Util {
 
 wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
 	wgpu::SurfaceTexture surfaceTexture(wgpu::Default);
@@ -26,4 +26,5 @@ wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
 	textureToRelease = texture;
 
 	return targetView;
+}
 }

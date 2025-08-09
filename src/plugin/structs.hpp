@@ -310,5 +310,5 @@ struct RenderPassData {
 	std::string outputDepthTextureName;
 	std::vector<BindGroupsLinks> bindGroups;
 	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core)>> uniqueRenderCallback = std::nullopt;
-	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, Mesh &, ES::Plugin::Object::Component::Transform &, ES::Engine::Entity)>> perEntityCallback;
+	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &, ES::Plugin::Object::Component::Transform &, ES::Engine::Entity)>> perEntityCallback;
 };

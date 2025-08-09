@@ -1,9 +1,9 @@
 add_rules("mode.debug", "mode.release")
 add_requires("spdlog", "entt", "fmt", "glm")
-add_requires("wgpu-native ^24.0.0", {configs = {shared = true}})
-add_requires("glfw ^3.4", { configs = {shared = true} })
-add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = true}, debug = true})
-add_requires("imgui v1.92.0-docking", {configs = {shared = true, glfw = true, wgpu = true, wgpu_backend = "wgpu"}, debug = true})
+add_requires("wgpu-native ^24.0.0", {configs = {shared = false}})
+add_requires("glfw ^3.4", { configs = {shared = false} })
+add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = false}, debug = true})
+add_requires("imgui v1.92.0-docking", {configs = {shared = false, glfw = true, wgpu = true, wgpu_backend = "wgpu"}, debug = true})
 add_requires("stb")
 
 includes("../../EngineSquared/xmake.lua")
@@ -34,6 +34,8 @@ target(project_name)
     add_includedirs("src/", {public = true})
     add_includedirs("src/plugin", {public = true})
     add_includedirs("src/plugin/system", {public = true})
+    add_includedirs("src/plugin/util", {public = true})
+    add_includedirs("src/plugin/component", {public = true})
 
     set_rundir("$(projectdir)")
 

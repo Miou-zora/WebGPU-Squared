@@ -1,7 +1,7 @@
-#pragma once
+#include "ReleaseAdapter.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void ReleaseAdapter(ES::Engine::Core &core)
 {
@@ -14,4 +14,5 @@ void ReleaseAdapter(ES::Engine::Core &core)
 	adapter = nullptr;
 	// TODO: Remove the adapter from the core resources (#252)
 	ES::Utils::Log::Debug("WebGPU adapter released.");
+}
 }

@@ -2,7 +2,6 @@
 
 #include "Core.hpp"
 
-
 namespace ES::Plugin::WebGPU::System {
-void ReleaseDevice(ES::Engine::Core &core);
+void InitializePipeline(ES::Engine::Core &core);
 }

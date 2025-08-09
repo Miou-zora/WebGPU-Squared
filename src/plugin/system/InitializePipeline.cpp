@@ -1,8 +1,11 @@
-#pragma once
-
+#include "InitializePipeline.hpp"
+#include "webgpu.hpp"
 #include "utils.hpp"
-#include "Engine.hpp"
-#include <webgpu/webgpu.h>
+#include "Window.hpp"
+#include "structs.hpp"
+
+
+namespace ES::Plugin::WebGPU::System {
 
 void InitializePipeline(ES::Engine::Core &core)
 {
@@ -126,4 +129,5 @@ void InitializePipeline(ES::Engine::Core &core)
 		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights},
 		.layout = layout,
 	};
+}
 }

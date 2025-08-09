@@ -2,7 +2,8 @@
 
 #include "Core.hpp"
 
-
 namespace ES::Plugin::WebGPU::System {
-void ReleaseDevice(ES::Engine::Core &core);
+
+void InitializeBuffers(ES::Engine::Core &core);
+
 }

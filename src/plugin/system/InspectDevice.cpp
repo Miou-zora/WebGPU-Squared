@@ -1,7 +1,7 @@
-#pragma once
+#include "InspectDevice.hpp"
+#include "webgpu.hpp"
 
-#include <webgpu/webgpu.h>
-#include "Engine.hpp"
+namespace ES::Plugin::WebGPU::System {
 
 void InspectDevice(ES::Engine::Core &core) {
     const wgpu::Device &device = core.GetResource<wgpu::Device>();
@@ -31,4 +31,5 @@ void InspectDevice(ES::Engine::Core &core) {
 	ES::Utils::Log::Info(fmt::format(" - maxTextureDimension2D: {}", limits.maxTextureDimension2D));
 	ES::Utils::Log::Info(fmt::format(" - maxTextureDimension3D: {}", limits.maxTextureDimension3D));
 	ES::Utils::Log::Info(fmt::format(" - maxTextureArrayLayers: {}", limits.maxTextureArrayLayers));
+}
 }
