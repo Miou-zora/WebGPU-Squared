@@ -19,5 +19,11 @@ void InitDepthBuffer(ES::Engine::Core &core) {
 	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
 	depthTextureView = depthTexture.createView();
+
+	Texture depthTextureViewData;
+
+	depthTextureViewData.textureView = depthTextureView;
+
+	core.GetResource<TextureManager>().Add("WindowDepthTexture", depthTextureViewData);
 	depthTexture.release();
 }

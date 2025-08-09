@@ -24,7 +24,7 @@ void InitializePipeline(ES::Engine::Core &core)
 	pipelineDesc.label = wgpu::StringView("My Render Pipeline");
 	wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
 
-	std::vector<wgpu::VertexAttribute> vertexAttribs(2);
+	std::vector<wgpu::VertexAttribute> vertexAttribs(3);
 
     // Describe the position attribute
     vertexAttribs[0].shaderLocation = 0;
@@ -36,10 +36,15 @@ void InitializePipeline(ES::Engine::Core &core)
     vertexAttribs[1].format = wgpu::VertexFormat::Float32x3;
     vertexAttribs[1].offset = 3 * sizeof(float);
 
+	// Describe the texture coordinate attribute
+	vertexAttribs[2].shaderLocation = 2;
+	vertexAttribs[2].format = wgpu::VertexFormat::Float32x2;
+	vertexAttribs[2].offset = 6 * sizeof(float);
+
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 6 * sizeof(float);
+    vertexBufferLayout.arrayStride = 8 * sizeof(float);
     vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
 
 	// TODO: find why it does not work with wgpu::BindGroupLayoutEntry

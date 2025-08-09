@@ -83,6 +83,8 @@ struct Texture {
 	wgpu::BindGroup bindGroup = nullptr;
 	wgpu::TextureFormat format = wgpu::TextureFormat::RGBA8Unorm;
 
+	Texture() = default;
+
 	Texture(wgpu::Device &device, const std::filesystem::path &path, wgpu::BindGroupLayout bindGroupLayout) {
 		int width, height, channels;
 	    unsigned char *pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 4 /* force 4 channels */);

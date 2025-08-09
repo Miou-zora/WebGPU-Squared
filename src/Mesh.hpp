@@ -7,13 +7,15 @@
 struct Mesh {
 	wgpu::Buffer pointBuffer = nullptr;
 	wgpu::Buffer indexBuffer = nullptr;
+	std::string pipelineName = "NONE";
+	std::vector<entt::hashed_string> textures;
 	uint32_t indexCount = 0;
 
 	bool enabled = true;
 
 	Mesh() = default;
 
-	Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const std::vector<glm::vec3> &normals, const std::vector<uint32_t> &indices) {
+	Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const std::vector<glm::vec3> &normals, const std::vector<glm::vec2> &uvs, const std::vector<uint32_t> &indices) {
 		auto &device = core.GetResource<wgpu::Device>();
 		auto &queue = core.GetResource<wgpu::Queue>();
 
@@ -25,6 +27,8 @@ struct Mesh {
 			pointData.push_back(normals.at(i).r);
 			pointData.push_back(normals.at(i).g);
 			pointData.push_back(normals.at(i).b);
+			pointData.push_back(uvs.at(i).x);
+			pointData.push_back(uvs.at(i).y);
 		}
 
 

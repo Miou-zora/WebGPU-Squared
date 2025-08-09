@@ -112,14 +112,14 @@ This render pass needs:
 - Bind vertex, index buffers
 - Draw call (indexed)
 */
-void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+void DrawMesh(ES::Engine::Core &core) {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
 	wgpu::Device &device = core.GetResource<wgpu::Device>();
 
-	const auto &transformMatrix = transform.getTransformationMatrix();
+	// const auto &transformMatrix = transform.getTransformationMatrix();
 
-	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
+	// queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
 
 
 	if (!textureView) throw std::runtime_error("Texture view is not created, cannot draw mesh.");
@@ -156,11 +156,18 @@ void DrawMesh(ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component:
 	auto &bindGroupLights = core.GetResource<BindGroups>().groups["2"];
 	renderPass.setBindGroup(1, bindGroupLights, 0, nullptr);
 
-	renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
-	renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
+	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+		if (!mesh.enabled) return;
+		const auto &transformMatrix = transform.getTransformationMatrix();
 
-	// Set binding group
-	renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+		queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
+
+		renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
+		renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
+
+		renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+	});
+
 
 	renderPass.end();
 	renderPass.release();
@@ -253,7 +260,27 @@ This render pass needs:
 - Bind vertex, index buffers
 - Draw call (indexed)
 */
-void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
+
+struct BindGroupsLinks {
+	enum class AssetType {
+		BindGroup, // often used for pur data like uniforms
+		TextureView,
+	} type;
+	std::string name; // In case of usage global
+	uint32_t groupIndex; // Index of the bind group in the pipeline
+};
+
+struct RenderPassData {
+	std::string name;
+	std::optional<std::string> pipelineName;
+	wgpu::LoadOp loadOp = wgpu::LoadOp::Load;
+	std::optional<std::function<glm::vec4(ES::Engine::Core &)>> clearColor; // 0 to 1 range, nullptr if load operation is not clear
+	std::string outputColorTextureName;
+	std::string outputDepthTextureName;
+	std::vector<BindGroupsLinks> bindGroups;
+	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, Mesh &, ES::Plugin::Object::Component::Transform &, ES::Engine::Entity)>> perEntityCallback;
+};
+void DrawSprite(ES::Engine::Core &core)
 {
 	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
 	PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines["2D"];
@@ -293,14 +320,19 @@ void DrawSprite(ES::Engine::Core &core, Sprite &sprite)
 	auto &bindGroup = core.GetResource<BindGroups>().groups["2D"];
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
-	auto &textures = core.GetResource<TextureManager>();
-	auto texture = textures.Get(sprite.textureHandleID);
-	renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
+	core.GetRegistry().view<Sprite>().each([&](Sprite &sprite) {
+		if (!sprite.enabled) return;
 
-	renderPass.setVertexBuffer(0, sprite.pointBuffer, 0, sprite.pointBuffer.getSize());
-	renderPass.setIndexBuffer(sprite.indexBuffer, wgpu::IndexFormat::Uint32, 0, sprite.indexBuffer.getSize());
+		auto &textures = core.GetResource<TextureManager>();
+		auto texture = textures.Get(sprite.textureHandleID);
+		renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
 
-	renderPass.drawIndexed(sprite.indexCount, 1, 0, 0, 0);
+		renderPass.setVertexBuffer(0, sprite.pointBuffer, 0, sprite.pointBuffer.getSize());
+		renderPass.setIndexBuffer(sprite.indexBuffer, wgpu::IndexFormat::Uint32, 0, sprite.indexBuffer.getSize());
+
+		renderPass.drawIndexed(sprite.indexCount, 1, 0, 0, 0);
+	});
+
 
 	renderPass.end();
 	renderPass.release();
@@ -373,23 +405,12 @@ void DrawMeshes(ES::Engine::Core &core)
 
 	// All of the buffers updates should be done before starting the render pass
 
-	// Two type of layer render passes:
-	// 1. One each entity with required components
-	// 2. One for one call rendering (gui)
-	// One of each layer can have preconditions to be drawn, like enabled or not.
-	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-		if (!mesh.enabled) return;
-		DrawMesh(core, mesh, transform);
-	});
+	// DrawMesh(core);
 
-	core.GetRegistry().view<Sprite>().each([&](Sprite &sprite) {
-		if (!sprite.enabled) return;
-		DrawSprite(core, sprite);
-	});
+	// core.GetRegistry().view<Sprite>().each([&](Sprite &sprite) {
+	// 	if (!sprite.enabled) return;
+	// 	DrawSprite(core, sprite);
+	// });
+	// DrawSprite(core);
 
-	DrawGui(core);
-
-	// At the end of the frame
-	textureView.release();
-	surface.present();
 }

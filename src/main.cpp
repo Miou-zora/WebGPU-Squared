@@ -87,7 +87,7 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	wgpu::ShaderModule shaderModule = device.createShaderModule(shaderDesc);
 	wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
 
-	std::vector<wgpu::VertexAttribute> vertexAttribs(2);
+	std::vector<wgpu::VertexAttribute> vertexAttribs(3);
 
     // Describe the position attribute
     vertexAttribs[0].shaderLocation = 0;
@@ -95,13 +95,17 @@ void Initialize2DPipeline(ES::Engine::Core &core)
     vertexAttribs[0].offset = 0;
 
 	vertexAttribs[1].shaderLocation = 1;
-	vertexAttribs[1].format = wgpu::VertexFormat::Float32x2;
+	vertexAttribs[1].format = wgpu::VertexFormat::Float32x3;
 	vertexAttribs[1].offset = 3 * sizeof(float); // Offset by the size of the position attribute
+
+	vertexAttribs[2].shaderLocation = 2;
+	vertexAttribs[2].format = wgpu::VertexFormat::Float32x2;
+	vertexAttribs[2].offset = 6 * sizeof(float); // Offset by the size of the position attribute
 
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = (3 * sizeof(float)) + (2 * sizeof(float));
+    vertexBufferLayout.arrayStride = (8 * sizeof(float));
     vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
 
 		// TODO: find why it does not work with wgpu::BindGroupLayoutEntry
@@ -299,6 +303,16 @@ void GenerateSurfaceTexture(ES::Engine::Core &core)
 	wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
 	textureView = GetNextSurfaceViewData(surface);
 	if (textureView == nullptr) throw std::runtime_error("Could not get next surface texture view");
+
+	Texture texture;
+
+	texture.textureView = textureView;
+
+	if (core.GetResource<TextureManager>().Contains("WindowColorTexture")) {
+		core.GetResource<TextureManager>().Get("WindowColorTexture").textureView = textureView;
+	} else {
+		core.GetResource<TextureManager>().Add("WindowColorTexture", texture);
+	}
 }
 
 // std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
@@ -328,6 +342,113 @@ void GenerateSurfaceTexture(ES::Engine::Core &core)
 	// 	return color;
 	// });
 // }
+
+
+void CustomRenderPass(ES::Engine::Core &core, RenderPassData renderPassData)
+{
+	wgpu::Queue &queue = core.GetResource<wgpu::Queue>();
+	wgpu::Device &device = core.GetResource<wgpu::Device>();
+
+	wgpu::CommandEncoderDescriptor encoderDesc(wgpu::Default);
+	std::string encoderDescLabel = fmt::format("CreateRenderPass::{}::CommandEncoder", renderPassData.name);
+	encoderDesc.label = wgpu::StringView(encoderDescLabel);
+	auto commandEncoder = device.createCommandEncoder(encoderDesc);
+	if (commandEncoder == nullptr) throw std::runtime_error(fmt::format("CreateRenderPass::{}::Command encoder is not created, cannot draw sprite.", renderPassData.name));
+
+	wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
+	std::string renderPassDescLabel = fmt::format("CreateRenderPass::{}::RenderPass", renderPassData.name);
+	renderPassDesc.label = wgpu::StringView(renderPassDescLabel);
+
+	// Target Texture
+	wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+	{
+		renderPassColorAttachment.view = core.GetResource<TextureManager>().Get(entt::hashed_string(renderPassData.outputColorTextureName.c_str())).textureView;
+		renderPassColorAttachment.loadOp = renderPassData.loadOp;
+		renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+		if (renderPassData.clearColor.has_value()) {
+			glm::vec4 clearColor = renderPassData.clearColor.value()(core);
+			renderPassColorAttachment.clearValue = wgpu::Color(
+				clearColor.r,
+				clearColor.g,
+				clearColor.b,
+				clearColor.a
+			);
+		}
+	}
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+	{
+		depthStencilAttachment.view = core.GetResource<TextureManager>().Get(entt::hashed_string(renderPassData.outputDepthTextureName.c_str())).textureView;
+		depthStencilAttachment.depthClearValue = 1.0f;
+		depthStencilAttachment.depthLoadOp = renderPassData.loadOp;
+		depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+	}
+
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+	wgpu::RenderPassEncoder renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+	// Select which render pipeline to use
+	if (renderPassData.pipelineName.has_value()) {
+		PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines[renderPassData.pipelineName.value()];
+		renderPass.setPipeline(pipelineData.pipeline);
+	}
+
+	for (const BindGroupsLinks &link : renderPassData.bindGroups) {
+		auto name = link.name;
+		if (link.type == BindGroupsLinks::AssetType::BindGroup) {
+			auto &bindGroups = core.GetResource<BindGroups>();
+			if (bindGroups.groups.contains(name)) {
+				renderPass.setBindGroup(link.groupIndex, bindGroups.groups[name], 0, nullptr);
+			} else {
+				ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Bind group with name '{}' not found.", renderPassData.name, name));
+			}
+		} else if (link.type == BindGroupsLinks::AssetType::TextureView) {
+			auto &textures = core.GetResource<TextureManager>();
+			auto textureID = entt::hashed_string(name.c_str());
+			if (textures.Contains(textureID)) {
+				auto &texture = textures.Get(textureID);
+				renderPass.setBindGroup(link.groupIndex, texture.bindGroup, 0, nullptr);
+			} else {
+				ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Texture with name '{}' not found.", renderPassData.name, name));
+			}
+		} else {
+			ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Unknown BindGroupsLinks type.", renderPassData.name));
+		}
+	}
+
+	core.GetRegistry().view<Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
+		if (!mesh.enabled || mesh.pipelineName != renderPassData.pipelineName) return;
+
+		const auto &transformMatrix = transform.getTransformationMatrix();
+		queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
+
+		if (renderPassData.perEntityCallback.has_value()) {
+			renderPassData.perEntityCallback.value()(renderPass, core, mesh, transform, ES::Engine::Entity(e));
+		}
+
+		renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
+		renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
+
+		renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+	});
+
+
+	renderPass.end();
+	renderPass.release();
+
+	// Finally encode and submit the render pass
+	wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
+	cmdBufferDescriptor.label = wgpu::StringView(fmt::format("CreateRenderPass::{}::CommandBuffer", renderPassData.name));
+	auto command = commandEncoder.finish(cmdBufferDescriptor);
+	commandEncoder.release();
+
+	queue.submit(1, &command);
+	command.release();
+}
 
 
 namespace ES::Plugin::WebGPU {
@@ -370,18 +491,82 @@ class Plugin : public ES::Engine::APlugin {
 			Create2DPipelineBuffer,
 			CreateBindingGroup,
 			CreateBindingGroup2D,
-			SetupResizableWindow
+			SetupResizableWindow,
+			[](ES::Engine::Core &core) {
+				stbi_set_flip_vertically_on_load(true);
+			}
+		);
+		RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
+			DrawMeshes,
+			GenerateSurfaceTexture,
+			[](ES::Engine::Core &core) {
+				CustomRenderPass(core,
+					RenderPassData{
+						.name = "ClearRenderPass",
+						.outputColorTextureName = "WindowColorTexture",
+						.outputDepthTextureName = "WindowDepthTexture",
+						.loadOp = wgpu::LoadOp::Clear,
+						.clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
+							auto &clearColor = core.GetResource<ClearColor>().value;
+							return glm::vec4(
+								clearColor.r,
+								clearColor.g,
+								clearColor.b,
+								clearColor.a
+							);
+						},
+					}
+				);
+			},
+			[](ES::Engine::Core &core) {
+				CustomRenderPass(core,
+					RenderPassData{
+						.name = "3DRenderPass",
+						.outputColorTextureName = "WindowColorTexture",
+						.outputDepthTextureName = "WindowDepthTexture",
+						.loadOp = wgpu::LoadOp::Load,
+						.bindGroups = {
+							{ .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
+							{ .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
+						},
+						.pipelineName = "3D"
+					}
+				);
+			},
+			[](ES::Engine::Core &core) {
+				CustomRenderPass(core,
+					RenderPassData{
+						.name = "2DRenderPass",
+						.outputColorTextureName = "WindowColorTexture",
+						.outputDepthTextureName = "WindowDepthTexture",
+						.loadOp = wgpu::LoadOp::Load,
+						.bindGroups = {
+							{ .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
+						},
+						.pipelineName = "2D",
+						.perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
+							auto &textures = core.GetResource<TextureManager>();
+							auto texture = textures.Get(mesh.textures[0]);
+							renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
+						}
+					}
+				);
+			}
 		);
 		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
-			GenerateSurfaceTexture,
-			Clear,
-			DrawMeshes
+			[](ES::Engine::Core &core) {
+				wgpu::Surface &surface = core.GetResource<wgpu::Surface>();
+
+				// Stop having access to the texture view after the render pass is done
+				textureView.release();
+				// Present the rendered texture to the surface
+				surface.present();
+			}
 		);
 		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
 			ReleaseBindingGroup,
 			ReleaseUniforms,
 			ReleaseBuffers,
-			ReleasePipeline,
 			TerminateDepthBuffer,
 			ReleaseDevice,
 			ReleaseSurface,
@@ -391,7 +576,40 @@ class Plugin : public ES::Engine::APlugin {
 };
 }
 
+namespace ES::Plugin::ImGUI::WebGPU {
+class Plugin : public ES::Engine::APlugin {
+  public:
+    using APlugin::APlugin;
+    ~Plugin() = default;
 
+    void Bind() final {
+		RequirePlugins<ES::Plugin::WebGPU::Plugin>();
+
+		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
+			[](ES::Engine::Core &core) {
+				auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+				IMGUI_CHECKVERSION();
+				ImGui::CreateContext();
+				ImGuiIO& io = ImGui::GetIO();
+
+				io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+				io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+				io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+				ImGui_ImplGlfw_InitForOther(window.GetGLFWWindow(), true);
+			},
+			[](ES::Engine::Core &core) {
+				ImGui_ImplWGPU_InitInfo info = ImGui_ImplWGPU_InitInfo();
+				info.DepthStencilFormat = depthTextureFormat;
+				info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
+				info.Device = core.GetResource<wgpu::Device>();
+				ImGui_ImplWGPU_Init(&info);
+			}
+		);
+	}
+};
+}
 
 static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
 {
@@ -448,6 +666,39 @@ void MovementSystem(ES::Engine::Core &core)
 
 }
 
+bool CreateSprite(const glm::vec2 &position, const glm::vec2 &size, std::vector<glm::vec3> &vertices, std::vector<glm::vec3> &normals, std::vector<glm::vec2> &texCoords, std::vector<uint32_t> &indices)
+{
+	vertices.resize(4);
+	vertices[0] = glm::vec3(position.x, position.y, 0.0f);
+	vertices[1] = glm::vec3(position.x + size.x, position.y, 0.0f);
+	vertices[2] = glm::vec3(position.x + size.x, position.y + size.y, 0.0f);
+	vertices[3] = glm::vec3(position.x, position.y + size.y, 0.0f);
+
+	normals.resize(4);
+	normals[0] = glm::vec3(0.0f, 0.0f, 1.0f);
+	normals[1] = glm::vec3(0.0f, 0.0f, 1.0f);
+	normals[2] = glm::vec3(0.0f, 0.0f, 1.0f);
+	normals[3] = glm::vec3(0.0f, 0.0f, 1.0f);
+
+	texCoords.resize(4);
+	texCoords[0] = glm::vec2(0.0f, 0.0f);
+	texCoords[1] = glm::vec2(1.0f, 0.0f);
+	texCoords[2] = glm::vec2(1.0f, 1.0f);
+	texCoords[3] = glm::vec2(0.0f, 1.0f);
+
+	indices.resize(6);
+	indices[0] = 0; // Bottom left
+	indices[1] = 1; // Bottom right
+	indices[2] = 2; // Top right
+	indices[3] = 0; // Bottom left
+	indices[4] = 2; // Top right
+	indices[5] = 3; // Top left
+
+	return true;
+}
+
+
+
 auto main(int ac, char **av) -> int
 {
 	ES::Engine::Core core;
@@ -456,28 +707,9 @@ auto main(int ac, char **av) -> int
 	spdlog::set_level(spdlog::level::debug);
 #endif
 
-	core.AddPlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin>();
+	core.AddPlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin, ES::Plugin::ImGUI::WebGPU::Plugin>();
 
-	core.RegisterSystem<ES::Plugin::RenderingPipeline::Setup>([](ES::Engine::Core &core) {
-		auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-		ImGuiIO& io = ImGui::GetIO();
-
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-
-		ImGui_ImplGlfw_InitForOther(window.GetGLFWWindow(), true);
-	},
-	[](ES::Engine::Core &core) {
-		ImGui_ImplWGPU_InitInfo info = ImGui_ImplWGPU_InitInfo();
-		info.DepthStencilFormat = depthTextureFormat;
-		info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
-		info.Device = core.GetResource<wgpu::Device>();
-		ImGui_ImplWGPU_Init(&info);
-	},
+	core.RegisterSystem<ES::Plugin::RenderingPipeline::Setup>(
 	[](ES::Engine::Core &core) {
 		auto &lights = core.GetResource<std::vector<Light>>();
 
@@ -525,6 +757,10 @@ auto main(int ac, char **av) -> int
 		.sensitivity = 0.005f,
 		.scrollSensitivity = 0.1f
 	});
+
+	core.RegisterSystem<ES::Plugin::RenderingPipeline::ToGPU>(
+		DrawGui
+	);
 
 	core.RegisterSystem(MovementSystem,
 	[](ES::Engine::Core &core) {
@@ -586,9 +822,9 @@ auto main(int ac, char **av) -> int
 
 		inputManager.RegisterMouseButtonCallback([&](ES::Engine::Core &cbCore, int button, int action, int) {
 			ImGuiIO& io = ImGui::GetIO();
+			// TODO: find a way to properly lock callbacks to ImGui
 			if (io.WantCaptureMouse) {
 				ImGui_ImplGlfw_MouseButtonCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), button, action, 0);
-				return;
 			}
 			auto &cameraData = cbCore.GetResource<CameraData>();
 			auto &drag = cbCore.GetResource<DragState>();
@@ -597,6 +833,7 @@ auto main(int ac, char **av) -> int
 			if (button == GLFW_MOUSE_BUTTON_LEFT) {
 				switch(action) {
 				case GLFW_PRESS:
+					if (io.WantCaptureMouse) return;
 					drag.active = true;
 					drag.startMouse = glm::vec2(-mousePos.x, -window.GetSize().y+mousePos.y);
 					drag.originYaw = cameraData.yaw;
@@ -635,7 +872,7 @@ auto main(int ac, char **av) -> int
 		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/sponza.obj", vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Model cant be loaded");
 
-		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
+		entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices).pipelineName = "3D";
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Sponza");
 	},
@@ -650,7 +887,7 @@ auto main(int ac, char **av) -> int
 		bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
 		if (!success) throw std::runtime_error("Model cant be loaded");
 
-		entity.AddComponent<Mesh>(core, core, vertices, normals, indices);
+		entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices).pipelineName = "3D";
 		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Finish");
 	},
@@ -661,7 +898,18 @@ auto main(int ac, char **av) -> int
 		auto &pipelines = core.GetResource<Pipelines>();
 		textureManager.Add(entt::hashed_string("sprite_example"), core.GetResource<wgpu::Device>(), "./assets/insect.png", pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
 
-		entity.AddComponent<Sprite>(core, core, glm::vec2(-50.f, -100.f), glm::vec2(284.0f, 372.0f), entt::hashed_string("sprite_example"));
+		std::vector<glm::vec3> vertices;
+		std::vector<glm::vec3> normals;
+		std::vector<glm::vec2> texCoords;
+		std::vector<uint32_t> indices;
+
+		bool success = CreateSprite(glm::vec2(-50.f, -100.f), glm::vec2(284.0f, 372.0f), vertices, normals, texCoords, indices);
+		if (!success) throw std::runtime_error("Sprite cant be loaded");
+
+		auto &mesh = entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices);
+		mesh.pipelineName = "2D";
+		mesh.textures.push_back(entt::hashed_string("sprite_example"));
+		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Sprite Example");
 	},
 	[&](ES::Engine::Core &core) {
@@ -681,7 +929,18 @@ auto main(int ac, char **av) -> int
 			return color;
 		}, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
 
-		entity.AddComponent<Sprite>(core, core, glm::vec2(0.f, -350.f), glm::vec2(200.0f, 200.0f), entt::hashed_string("sprite_example_2"));
+		std::vector<glm::vec3> vertices;
+		std::vector<glm::vec3> normals;
+		std::vector<glm::vec2> texCoords;
+		std::vector<uint32_t> indices;
+
+		bool success = CreateSprite(glm::vec2(0.f, -350.f), glm::vec2(200.0f, 200.0f), vertices, normals, texCoords, indices);
+		if (!success) throw std::runtime_error("Sprite cant be loaded");
+
+		auto &mesh = entity.AddComponent<Mesh>(core, core, vertices, normals, texCoords, indices);
+		mesh.pipelineName = "2D";
+		mesh.textures.push_back(entt::hashed_string("sprite_example_2"));
+		entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 		entity.AddComponent<Name>(core, "Sprite Example 2");
 	});
 
