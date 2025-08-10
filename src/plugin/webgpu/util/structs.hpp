@@ -34,31 +34,14 @@ struct Light {
 static_assert(sizeof(Light) % 16 == 0, "Light struct must be 16 bytes for WebGPU alignment");
 
 struct CameraData {
-	glm::vec3 position;
-	float yaw; // Yaw angle in radians
-	float pitch; // Pitch angle in radians
-	glm::vec3 up;
-	float fovY; // Field of view in radians
-	float nearPlane;
-	float farPlane;
-	float aspectRatio;
-};
-
-struct DragState {
-    // Whether a drag action is ongoing (i.e., we are between mouse press and mouse release)
-    bool active = false;
-    // The position of the mouse at the beginning of the drag action
-    glm::vec2 startMouse;
-    // The camera state at the beginning of the drag action
-    float originYaw = 0.0f;
-    float originPitch = 0.0f;
-
-    // Constant settings
-    float sensitivity = 0.01f;
-    float scrollSensitivity = 0.1f;
-	glm::vec2 velocity = {0.0, 0.0};
-    glm::vec2 previousDelta = {0.0, 0.0};
-    float inertia = 0.9f;
+	glm::vec3 position = { 0.0f, 0.0f, 0.0f };
+	float yaw = 0.0f; // Yaw angle in radians
+	float pitch = 0.0f; // Pitch angle in radians
+	glm::vec3 up = { 0.0f, 1.0f, 0.0f };
+	float fovY = glm::radians(70.0f); // Field of view in radians
+	float nearPlane = 10.0f;
+	float farPlane = 10000.0f;
+	float aspectRatio = 800.0f / 800.0f;
 };
 
 struct ClearColor {

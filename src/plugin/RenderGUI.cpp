@@ -80,7 +80,7 @@ void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	ImGui::EndChild();
 
 	if (lightsDirty) {
-		ES::Plugin::WebGPU::Utils::UpdateLights(core);
+		ES::Plugin::WebGPU::Util::UpdateLights(core);
 	}
 
 	ImGui::End();

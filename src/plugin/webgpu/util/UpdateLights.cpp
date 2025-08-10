@@ -2,7 +2,7 @@
 #include "UpdateLights.hpp"
 #include "structs.hpp"
 
-namespace ES::Plugin::WebGPU::Utils {
+namespace ES::Plugin::WebGPU::Util {
 
 void UpdateLights(ES::Engine::Core &core)
 {

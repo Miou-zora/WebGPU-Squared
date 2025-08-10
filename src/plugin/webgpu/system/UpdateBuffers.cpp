@@ -1,7 +1,6 @@
 #include "webgpu.hpp"
 #include "UpdateBuffers.hpp"
 #include "structs.hpp"
-#include "UpdateLights.hpp"
 #include "Window.hpp"
 
 namespace ES::Plugin::WebGPU::System {
