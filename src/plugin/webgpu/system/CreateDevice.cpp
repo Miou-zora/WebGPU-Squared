@@ -1,6 +1,5 @@
 #include "CreateDevice.hpp"
-#include "webgpu.hpp"
-#include "utils.hpp"
+#include "WebGPU.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 

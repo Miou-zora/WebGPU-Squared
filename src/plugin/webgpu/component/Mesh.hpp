@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
-#include "webgpu.hpp"
+#include "util/webgpu.hpp"
 #include <entt/entt.hpp>
 #include "Core.hpp"
 

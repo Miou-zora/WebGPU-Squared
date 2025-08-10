@@ -1,6 +1,5 @@
 #include "CreateBindingGroup.hpp"
-#include "webgpu.hpp"
-#include "structs.hpp"
+#include "WebGPU.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 void CreateBindingGroup(ES::Engine::Core &core)

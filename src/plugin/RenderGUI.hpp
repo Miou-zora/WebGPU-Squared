@@ -1,6 +1,6 @@
 #pragma once
 
-#include "webgpu.hpp"
+#include "util/webgpu.hpp"
 #include "Core.hpp"
 
 //TODO: use ImGUI namespace

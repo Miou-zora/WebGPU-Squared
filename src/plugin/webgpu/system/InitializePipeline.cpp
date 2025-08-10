@@ -1,8 +1,6 @@
 #include "InitializePipeline.hpp"
-#include "webgpu.hpp"
-#include "utils.hpp"
+#include "WebGPU.hpp"
 #include "Window.hpp"
-#include "structs.hpp"
 
 
 namespace ES::Plugin::WebGPU::System {

@@ -33,9 +33,11 @@ target(project_name)
     add_headerfiles("src/**.hpp", { public = true })
     add_includedirs("src/", {public = true})
     add_includedirs("src/plugin", {public = true})
+    add_includedirs("src/plugin/webgpu", {public = true})
     add_includedirs("src/plugin/webgpu/system", {public = true})
     add_includedirs("src/plugin/webgpu/util", {public = true})
     add_includedirs("src/plugin/webgpu/component", {public = true})
+    add_includedirs("src/plugin/webgpu/plugin", {public = true})
 
     set_rundir("$(projectdir)")
 

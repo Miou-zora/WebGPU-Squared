@@ -1,6 +1,5 @@
 #include "Create2DPipelineBuffer.hpp"
-#include "webgpu.hpp"
-#include "structs.hpp"
+#include "WebGPU.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 

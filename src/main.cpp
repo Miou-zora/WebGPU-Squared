@@ -2,9 +2,7 @@
 #define GLM_FORCE_LEFT_HANDED
 #include <glm/ext.hpp>
 
-
-#define WEBGPU_CPP_IMPLEMENTATION
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -18,51 +16,12 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <GLFW/glfw3.h>
 #include "RenderingPipeline.hpp"
-#include "structs.hpp"
 
 #include <imgui.h>
 #include <backends/imgui_impl_wgpu.h>
 #include <backends/imgui_impl_glfw.h>
 
-#include "Mesh.hpp"
-#include "utils.hpp"
-#include "AdaptaterPrint.hpp"
-#include "InspectDevice.hpp"
-#include "InitBuffers.hpp"
-#include "InitializePipeline.hpp"
-#include "CreateSurface.hpp"
-#include "CreateInstance.hpp"
-#include "CreateAdapter.hpp"
-#include "ReleaseInstance.hpp"
-#include "RequestCapabilities.hpp"
-#include "CreateDevice.hpp"
-#include "CreateQueue.hpp"
-#include "SetupQueueOnSubmittedWorkDone.hpp"
-#include "ConfigureSurface.hpp"
-#include "ReleaseAdapter.hpp"
-#include "CreateBindingGroup.hpp"
-#include "GetNextSurfaceViewData.hpp"
 #include "RenderGUI.hpp"
-#include "UpdateBuffers.hpp"
-#include "ReleasePipeline.hpp"
-#include "ReleaseBuffers.hpp"
-#include "ReleaseDevice.hpp"
-#include "ReleaseSurface.hpp"
-#include "ReleaseQueue.hpp"
-#include "ReleaseUniforms.hpp"
-#include "ReleaseBindingGroup.hpp"
-#include "TerminateDepthBuffer.hpp"
-#include "InitDepthBuffer.hpp"
-#include "UnconfigureSurface.hpp"
-#include "SetupResizableWindow.hpp"
-#include "UpdateLights.hpp"
-#include "Initialize2DPipeline.hpp"
-#include "Create2DPipelineBuffer.hpp"
-#include "CreateBindingGroup2D.hpp"
-#include "GenerateSurfaceTexture.hpp"
-#include "CustomRenderPass.hpp"
-#include "CreateSprite.hpp"
-#include "Render.hpp"
 
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
@@ -82,126 +41,6 @@ struct DragState {
     glm::vec2 previousDelta = {0.0, 0.0};
     float inertia = 0.9f;
 };
-
-namespace ES::Plugin::WebGPU {
-class Plugin : public ES::Engine::APlugin {
-  public:
-    using APlugin::APlugin;
-    ~Plugin() = default;
-
-    void Bind() final {
-		RequirePlugins<ES::Plugin::Window::Plugin>();
-
-		RegisterResource(ClearColor());
-		RegisterResource(Pipelines());
-		RegisterResource(TextureManager());
-		RegisterResource(std::vector<Light>());
-		RegisterResource(CameraData());
-
-		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
-			System::CreateInstance,
-			System::CreateSurface,
-			System::CreateAdapter,
-#if defined(ES_DEBUG)
-			System::AdaptaterPrintLimits,
-			System::AdaptaterPrintFeatures,
-			System::AdaptaterPrintProperties,
-#endif
-			System::ReleaseInstance,
-			System::RequestCapabilities,
-			System::CreateDevice,
-			System::CreateQueue,
-			System::SetupQueueOnSubmittedWorkDone,
-			System::ConfigureSurface,
-			System::ReleaseAdapter,
-#if defined(ES_DEBUG)
-			System::InspectDevice,
-#endif
-			System::InitDepthBuffer,
-			System::InitializePipeline,
-			System::Initialize2DPipeline,
-			System::InitializeBuffers,
-			System::Create2DPipelineBuffer,
-			System::CreateBindingGroup,
-			System::CreateBindingGroup2D,
-			System::SetupResizableWindow,
-			[](ES::Engine::Core &core) {
-				stbi_set_flip_vertically_on_load(true);
-			}
-		);
-		RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
-			System::UpdateBuffers,
-			System::GenerateSurfaceTexture,
-			[](ES::Engine::Core &core) {
-				Util::CustomRenderPass(core,
-					RenderPassData{
-						.name = "ClearRenderPass",
-						.outputColorTextureName = "WindowColorTexture",
-						.outputDepthTextureName = "WindowDepthTexture",
-						.loadOp = wgpu::LoadOp::Clear,
-						.clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-							auto &clearColor = core.GetResource<ClearColor>().value;
-							return glm::vec4(
-								clearColor.r,
-								clearColor.g,
-								clearColor.b,
-								clearColor.a
-							);
-						},
-					}
-				);
-			},
-			[](ES::Engine::Core &core) {
-				Util::CustomRenderPass(core,
-					RenderPassData{
-						.name = "3DRenderPass",
-						.outputColorTextureName = "WindowColorTexture",
-						.outputDepthTextureName = "WindowDepthTexture",
-						.loadOp = wgpu::LoadOp::Load,
-						.bindGroups = {
-							{ .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
-							{ .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
-						},
-						.pipelineName = "3D"
-					}
-				);
-			},
-			[](ES::Engine::Core &core) {
-				Util::CustomRenderPass(core,
-					RenderPassData{
-						.name = "2DRenderPass",
-						.outputColorTextureName = "WindowColorTexture",
-						.outputDepthTextureName = "WindowDepthTexture",
-						.loadOp = wgpu::LoadOp::Load,
-						.bindGroups = {
-							{ .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
-						},
-						.pipelineName = "2D",
-						.perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
-							auto &textures = core.GetResource<TextureManager>();
-							auto texture = textures.Get(mesh.textures[0]);
-							renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
-						}
-					}
-				);
-			}
-		);
-		RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
-			System::Render
-		);
-		RegisterSystems<ES::Engine::Scheduler::Shutdown>(
-			System::ReleaseBindingGroup,
-			System::ReleaseUniforms,
-			System::ReleaseBuffers,
-			System::TerminateDepthBuffer,
-			System::ReleasePipeline,
-			System::ReleaseDevice,
-			System::ReleaseSurface,
-			System::ReleaseQueue
-		);
-	}
-};
-}
 
 namespace ES::Plugin::ImGUI::WebGPU {
 class Plugin : public ES::Engine::APlugin {

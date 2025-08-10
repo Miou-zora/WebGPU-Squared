@@ -1,5 +1,5 @@
 #include "ReleaseAdapter.hpp"
-#include "webgpu.hpp"
+#include "util/webgpu.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 
