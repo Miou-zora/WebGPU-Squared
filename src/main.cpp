@@ -20,8 +20,6 @@
 #include "RenderingPipeline.hpp"
 #include "structs.hpp"
 
-#define STB_IMAGE_IMPLEMENTATION
-
 #include <imgui.h>
 #include <backends/imgui_impl_wgpu.h>
 #include <backends/imgui_impl_glfw.h>
@@ -72,11 +70,8 @@ uint32_t uniformStride = 0;
 float cameraScale = 100.0f;
 
 struct DragState {
-    // Whether a drag action is ongoing (i.e., we are between mouse press and mouse release)
     bool active = false;
-    // The position of the mouse at the beginning of the drag action
     glm::vec2 startMouse = { 0.0f, 0.0f };
-    // The camera state at the beginning of the drag action
     float originYaw = 0.0f;
     float originPitch = 0.0f;
 
@@ -317,6 +312,8 @@ class CameraPlugin : public ES::Engine::APlugin {
     	~CameraPlugin() = default;
 
     	void Bind() final {
+			RequirePlugins<ES::Plugin::WebGPU::Plugin, ES::Plugin::Input::Plugin>();
+
 			RegisterResource(DragState());
 
 			RegisterSystems<ES::Engine::Scheduler::Update>(
@@ -433,7 +430,6 @@ auto main(int ac, char **av) -> int
 
 	core.AddPlugins<
 		ES::Plugin::WebGPU::Plugin,
-		ES::Plugin::Input::Plugin,
 		ES::Plugin::ImGUI::WebGPU::Plugin,
 		CameraPlugin
 	>();
@@ -570,7 +566,7 @@ auto main(int ac, char **av) -> int
 			std::vector<uint32_t> indices;
 
 			ES::Plugin::WebGPU::Util::CreateSprite(glm::vec2(0.f, -350.f), glm::vec2(200.0f, 200.0f), vertices, normals, texCoords, indices);
-			
+
 			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 			mesh.pipelineName = "2D";
 			mesh.textures.push_back(entt::hashed_string("sprite_example_2"));

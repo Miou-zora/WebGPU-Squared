@@ -8,6 +8,8 @@ namespace ES::Plugin::WebGPU::System {
 void InitDepthBuffer(ES::Engine::Core &core) {
 	auto &device = core.GetResource<wgpu::Device>();
 	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
+	auto &textureManager = core.GetResource<TextureManager>();
+
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize depth buffer.");
 
 	int frameBufferSizeX, frameBufferSizeY;
@@ -26,7 +28,11 @@ void InitDepthBuffer(ES::Engine::Core &core) {
 
 	depthTextureViewData.textureView = depthTextureView;
 
-	core.GetResource<TextureManager>().Add("WindowDepthTexture", depthTextureViewData);
+	if (textureManager.Contains("WindowDepthTexture")) {
+		textureManager.Get("WindowDepthTexture") = depthTextureViewData;
+	} else {
+		textureManager.Add("WindowDepthTexture", depthTextureViewData);
+	}
 	depthTexture.release();
 }
 }
