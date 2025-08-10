@@ -1,5 +1,5 @@
 #include "ReleaseSurface.hpp"
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 void ReleaseSurface(ES::Engine::Core &core)

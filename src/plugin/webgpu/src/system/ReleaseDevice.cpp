@@ -1,4 +1,4 @@
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "ReleaseDevice.hpp"
 
 namespace ES::Plugin::WebGPU::System {

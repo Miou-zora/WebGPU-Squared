@@ -1,6 +1,6 @@
 #include "AdaptaterPrint.hpp"
 
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "utils.hpp"
 
 namespace ES::Plugin::WebGPU::System {

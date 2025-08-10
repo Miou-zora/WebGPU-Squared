@@ -1,4 +1,4 @@
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "UpdateBuffers.hpp"
 #include "structs.hpp"
 #include "Window.hpp"

@@ -1,5 +1,5 @@
 #include "InitDepthBuffer.hpp"
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "Window.hpp"
 #include "structs.hpp"
 

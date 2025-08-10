@@ -7,6 +7,8 @@ add_requires("imgui v1.92.0-docking", {configs = {shared = false, glfw = true, w
 add_requires("stb")
 
 includes("../../EngineSquared/xmake.lua")
+includes("src/plugin/imgui/xmake.lua")
+includes("src/plugin/webgpu/xmake.lua")
 
 local project_name = "e2-wgpu"
 
@@ -17,12 +19,14 @@ target(project_name)
     set_default(true)
     add_packages("wgpu-native")
     add_packages("spdlog", "entt", "fmt", "glm")
-    add_packages("imgui")
     add_packages("stb")
+    add_packages("imgui")
+    add_packages("glfw3webgpu")
 
     add_deps("EngineSquared")
-    add_packages("glfw3webgpu")
-    add_defines("IMGUI_IMPL_WEBGPU_BACKEND_WGPU")
+    add_deps("PluginImGUI")
+    add_deps("PluginWebGPU")
+
 
     if is_mode("debug") then
         add_defines("DEBUG")
@@ -32,12 +36,6 @@ target(project_name)
     add_files("src/**.cpp")
     add_headerfiles("src/**.hpp", { public = true })
     add_includedirs("src/", {public = true})
-    add_includedirs("src/plugin", {public = true})
-    add_includedirs("src/plugin/webgpu", {public = true})
-    add_includedirs("src/plugin/webgpu/system", {public = true})
-    add_includedirs("src/plugin/webgpu/util", {public = true})
-    add_includedirs("src/plugin/webgpu/component", {public = true})
-    add_includedirs("src/plugin/webgpu/plugin", {public = true})
 
     set_rundir("$(projectdir)")
 

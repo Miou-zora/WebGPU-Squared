@@ -1,27 +1,7 @@
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_FORCE_LEFT_HANDED
-#include <glm/ext.hpp>
-
+#include "ImGUI.hpp"
 #include "WebGPU.hpp"
-#include <iostream>
-#include <vector>
-#include <fstream>
-#include "Engine.hpp"
-#include "PluginWindow.hpp"
-#include "Input.hpp"
-#include "Window.hpp"
-#include "Object.hpp"
-#include <glm/glm.hpp>
-#include <glm/gtx/string_cast.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <GLFW/glfw3.h>
 #include "RenderingPipeline.hpp"
-
-#include <imgui.h>
-#include <backends/imgui_impl_wgpu.h>
-#include <backends/imgui_impl_glfw.h>
-
-#include "RenderGUI.hpp"
+#include "Input.hpp"
 
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
@@ -41,55 +21,6 @@ struct DragState {
     glm::vec2 previousDelta = {0.0, 0.0};
     float inertia = 0.9f;
 };
-
-namespace ES::Plugin::ImGUI::WebGPU {
-class Plugin : public ES::Engine::APlugin {
-  public:
-    using APlugin::APlugin;
-    ~Plugin() = default;
-
-    void Bind() final {
-		RequirePlugins<ES::Plugin::WebGPU::Plugin>();
-
-		RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
-			[](ES::Engine::Core &core) {
-				auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-				IMGUI_CHECKVERSION();
-				ImGui::CreateContext();
-				ImGuiIO& io = ImGui::GetIO();
-
-				io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-				io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-				io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-
-				ImGui_ImplGlfw_InitForOther(window.GetGLFWWindow(), true);
-			},
-			[](ES::Engine::Core &core) {
-				ImGui_ImplWGPU_InitInfo info = ImGui_ImplWGPU_InitInfo();
-				info.DepthStencilFormat = depthTextureFormat;
-				info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
-				info.Device = core.GetResource<wgpu::Device>();
-				ImGui_ImplWGPU_Init(&info);
-			}
-		);
-
-		RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
-			[](ES::Engine::Core &core) {
-				ES::Plugin::WebGPU::Util::CustomRenderPass(core,
-					RenderPassData{
-						.name = "GUIRenderPass",
-						.outputColorTextureName = "WindowColorTexture",
-						.outputDepthTextureName = "WindowDepthTexture",
-						.loadOp = wgpu::LoadOp::Load,
-						.uniqueRenderCallback = Util::RenderGUI
-					}
-				);
-			}
-		);
-	}
-};
-}
 
 static glm::vec3 GetKeyboardMovementForce(ES::Engine::Core &core)
 {
@@ -145,6 +76,30 @@ static void MovementSystem(ES::Engine::Core &core)
 
 }
 
+void UpdateNearFarPlanes(ES::Engine::Core &core)
+{
+	auto &cameraData = core.GetResource<CameraData>();
+	cameraData.farPlane = 100.0f * cameraScale;
+	cameraData.nearPlane = 0.1f * cameraScale;
+}
+
+void CameraInertia(ES::Engine::Core &core)
+{
+	auto &drag = core.GetResource<DragState>();
+	auto &cameraState = core.GetResource<CameraData>();
+
+	constexpr float eps = 1e-4f;
+	if (!drag.active) {
+		if (std::abs(drag.velocity.x) < eps && std::abs(drag.velocity.y) < eps) {
+			return;
+		}
+		cameraState.pitch += drag.velocity.y * drag.sensitivity;
+		cameraState.yaw += drag.velocity.x * drag.sensitivity;
+		cameraState.pitch = glm::clamp(cameraState.pitch, -glm::half_pi<float>() + 1e-5f, glm::half_pi<float>() - 1e-5f);
+		drag.velocity *= drag.inertia;
+	}
+}
+
 class CameraPlugin : public ES::Engine::APlugin {
 	public:
 		using APlugin::APlugin;
@@ -157,32 +112,11 @@ class CameraPlugin : public ES::Engine::APlugin {
 
 			RegisterSystems<ES::Engine::Scheduler::Update>(
 				MovementSystem,
-				[](ES::Engine::Core &core) {
-					auto &cameraData = core.GetResource<CameraData>();
-					cameraData.farPlane = 100.0f * cameraScale;
-					cameraData.nearPlane = 0.1f * cameraScale;
-				});
+				UpdateNearFarPlanes
+			);
 
 			RegisterSystems<ES::Engine::Scheduler::FixedTimeUpdate>(
-				[](ES::Engine::Core &core) {
-					auto &drag = core.GetResource<DragState>();
-					auto &cameraState = core.GetResource<CameraData>();
-
-					constexpr float eps = 1e-4f;
-					// Apply inertia only when the user released the click.
-					if (!drag.active) {
-						// Avoid updating the matrix when the velocity is no longer noticeable
-						if (std::abs(drag.velocity.x) < eps && std::abs(drag.velocity.y) < eps) {
-							return;
-						}
-						cameraState.pitch += drag.velocity.y * drag.sensitivity;
-						cameraState.yaw += drag.velocity.x * drag.sensitivity;
-						cameraState.pitch = glm::clamp(cameraState.pitch, -glm::half_pi<float>() + 1e-5f, glm::half_pi<float>() - 1e-5f);
-						// Dampen the velocity so that it decreases exponentially and stops
-						// after a few frames.
-						drag.velocity *= drag.inertia;
-					}
-				}
+				CameraInertia
 			);
 
 			RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
