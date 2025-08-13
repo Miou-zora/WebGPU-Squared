@@ -1,5 +1,5 @@
 #include "Render.hpp"
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "structs.hpp"
 
 namespace ES::Plugin::WebGPU::System {

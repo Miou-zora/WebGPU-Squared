@@ -1,4 +1,4 @@
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "Window.hpp"
 #include "ConfigureSurface.hpp"
 #include "InitDepthBuffer.hpp"

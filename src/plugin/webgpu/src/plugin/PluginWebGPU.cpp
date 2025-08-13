@@ -13,6 +13,7 @@ void Plugin::Bind() {
     RegisterResource(TextureManager());
     RegisterResource(std::vector<Light>());
     RegisterResource(CameraData());
+    RegisterResource(RenderGraph());
 
     RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
         System::CreateInstance,
@@ -43,63 +44,59 @@ void Plugin::Bind() {
         System::SetupResizableWindow,
         [](ES::Engine::Core &core) {
             stbi_set_flip_vertically_on_load(true);
+        },
+        [](ES::Engine::Core &core) {
+            core.GetResource<RenderGraph>().AddRenderPass(
+                RenderPassData{
+                    .name = "ClearRenderPass",
+                    .outputColorTextureName = "WindowColorTexture",
+                    .outputDepthTextureName = "WindowDepthTexture",
+                    .loadOp = wgpu::LoadOp::Clear,
+                .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
+                    auto &clearColor = core.GetResource<ClearColor>().value;
+                    return glm::vec4(
+                        clearColor.r,
+                        clearColor.g,
+                        clearColor.b,
+                        clearColor.a
+                    );
+                },
+            });
+            core.GetResource<RenderGraph>().AddRenderPass(
+                RenderPassData{
+                    .name = "3DRenderPass",
+                    .outputColorTextureName = "WindowColorTexture",
+                    .outputDepthTextureName = "WindowDepthTexture",
+                .loadOp = wgpu::LoadOp::Load,
+                .bindGroups = {
+                    { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
+                    { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
+                },
+                .pipelineName = "3D"
+            });
+            core.GetResource<RenderGraph>().AddRenderPass(
+                RenderPassData{
+                    .name = "2DRenderPass",
+                    .outputColorTextureName = "WindowColorTexture",
+                    .outputDepthTextureName = "WindowDepthTexture",
+                    .loadOp = wgpu::LoadOp::Load,
+                .bindGroups = {
+                    { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
+                },
+                .pipelineName = "2D",
+                .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
+                    auto &textures = core.GetResource<TextureManager>();
+                    auto texture = textures.Get(mesh.textures[0]);
+                    renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
+                }
+            });
         }
     );
     RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
         System::UpdateBuffers,
         System::GenerateSurfaceTexture,
         [](ES::Engine::Core &core) {
-            Util::CustomRenderPass(core,
-                RenderPassData{
-                    .name = "ClearRenderPass",
-                    .outputColorTextureName = "WindowColorTexture",
-                    .outputDepthTextureName = "WindowDepthTexture",
-                    .loadOp = wgpu::LoadOp::Clear,
-                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-                        auto &clearColor = core.GetResource<ClearColor>().value;
-                        return glm::vec4(
-                            clearColor.r,
-                            clearColor.g,
-                            clearColor.b,
-                            clearColor.a
-                        );
-                    },
-                }
-            );
-        },
-        [](ES::Engine::Core &core) {
-            Util::CustomRenderPass(core,
-                RenderPassData{
-                    .name = "3DRenderPass",
-                    .outputColorTextureName = "WindowColorTexture",
-                    .outputDepthTextureName = "WindowDepthTexture",
-                    .loadOp = wgpu::LoadOp::Load,
-                    .bindGroups = {
-                        { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
-                        { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
-                    },
-                    .pipelineName = "3D"
-                }
-            );
-        },
-        [](ES::Engine::Core &core) {
-            Util::CustomRenderPass(core,
-                RenderPassData{
-                    .name = "2DRenderPass",
-                    .outputColorTextureName = "WindowColorTexture",
-                    .outputDepthTextureName = "WindowDepthTexture",
-                    .loadOp = wgpu::LoadOp::Load,
-                    .bindGroups = {
-                        { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
-                    },
-                    .pipelineName = "2D",
-                    .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
-                        auto &textures = core.GetResource<TextureManager>();
-                        auto texture = textures.Get(mesh.textures[0]);
-                        renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
-                    }
-                }
-            );
+            core.GetResource<RenderGraph>().Execute(core);
         }
     );
     RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(

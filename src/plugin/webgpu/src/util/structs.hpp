@@ -95,6 +95,7 @@ struct RenderPassData {
 	std::optional<std::string> pipelineName;
 	wgpu::LoadOp loadOp = wgpu::LoadOp::Load;
 	std::optional<std::function<glm::vec4(ES::Engine::Core &)>> clearColor; // 0 to 1 range, nullptr if load operation is not clear
+	std::list<std::string> dependsOn;
 	std::string outputColorTextureName;
 	std::string outputDepthTextureName;
 	std::vector<BindGroupsLinks> bindGroups;

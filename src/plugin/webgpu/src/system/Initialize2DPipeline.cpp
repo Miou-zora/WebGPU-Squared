@@ -1,5 +1,5 @@
 #include "Initialize2DPipeline.hpp"
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "Window.hpp"
 #include "utils.hpp"
 #include "structs.hpp"

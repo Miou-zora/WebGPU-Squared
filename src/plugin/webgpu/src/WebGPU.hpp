@@ -3,7 +3,11 @@
 // --- Plugin ---
 #include "PluginWebGPU.hpp"
 
-// --- Components ---
+// --- Component ---
+#include "Mesh.hpp"
+
+// --- Resource
+#include "RenderGraph.hpp"
 
 // --- Util ---
 #include "CreateSprite.hpp"
@@ -13,7 +17,7 @@
 #include "utils.hpp"
 #include "util/webgpu.hpp"
 
-// --- Systems ---
+// --- System ---
 // Setup
 #include "CreateInstance.hpp"
 #include "CreateSurface.hpp"

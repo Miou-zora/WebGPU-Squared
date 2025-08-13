@@ -1,6 +1,6 @@
 
 #include "ConfigureSurface.hpp"
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "Window.hpp"
 
 void ES::Plugin::WebGPU::System::ConfigureSurface(ES::Engine::Core &core) {
