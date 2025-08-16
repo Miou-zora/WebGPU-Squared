@@ -43,7 +43,6 @@
 // To GPU
 #include "UpdateBuffers.hpp"
 #include "GenerateSurfaceTexture.hpp"
-#include "CustomRenderPass.hpp"
 
 // Draw
 #include "Render.hpp"

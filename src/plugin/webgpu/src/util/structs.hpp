@@ -90,13 +90,17 @@ struct BindGroupsLinks {
 	uint32_t groupIndex; // Index of the bind group in the pipeline
 };
 
+struct WindowResizeCallbacks {
+	std::map<std::string, std::function<void(ES::Engine::Core &, int width, int height)>> callbacks;
+};
+
 struct RenderPassData {
 	std::string name;
 	std::optional<std::string> pipelineName;
 	wgpu::LoadOp loadOp = wgpu::LoadOp::Load;
 	std::optional<std::function<glm::vec4(ES::Engine::Core &)>> clearColor; // 0 to 1 range, nullptr if load operation is not clear
 	std::list<std::string> dependsOn;
-	std::string outputColorTextureName;
+	std::vector<std::string> outputColorTextureName;
 	std::string outputDepthTextureName;
 	std::vector<BindGroupsLinks> bindGroups;
 	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core)>> uniqueRenderCallback = std::nullopt;

@@ -3,6 +3,7 @@
 #include "structs.hpp"
 #include "Entity.hpp"
 
+// TODO: Add namespace
 class RenderGraph {
     public:
         RenderGraph() = default;
@@ -33,12 +34,16 @@ class RenderGraph {
             std::string renderPassDescLabel = fmt::format("CreateRenderPass::{}::RenderPass", renderPassData.name);
             renderPassDesc.label = wgpu::StringView(renderPassDescLabel);
 
-            // Target Texture
-            wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
-            {
-                renderPassColorAttachment.view = core.GetResource<TextureManager>().Get(entt::hashed_string(renderPassData.outputColorTextureName.c_str())).textureView;
-                renderPassColorAttachment.loadOp = renderPassData.loadOp;
-                renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+            std::vector<wgpu::RenderPassColorAttachment> colorAttachments;
+            colorAttachments.reserve(renderPassData.outputColorTextureName.size());
+
+            for (const auto& colorTextureName : renderPassData.outputColorTextureName) {
+                wgpu::RenderPassColorAttachment renderPassColorAttachment(wgpu::Default);
+                {
+                    renderPassColorAttachment.view = core.GetResource<TextureManager>().Get(entt::hashed_string(colorTextureName.c_str())).textureView;
+                    renderPassColorAttachment.loadOp = renderPassData.loadOp;
+                    renderPassColorAttachment.storeOp = wgpu::StoreOp::Store;
+                }
                 if (renderPassData.clearColor.has_value()) {
                     glm::vec4 clearColor = renderPassData.clearColor.value()(core);
                     renderPassColorAttachment.clearValue = wgpu::Color(
@@ -48,10 +53,11 @@ class RenderGraph {
                         clearColor.a
                     );
                 }
+                colorAttachments.push_back(renderPassColorAttachment);
             }
 
-            renderPassDesc.colorAttachmentCount = 1;
-            renderPassDesc.colorAttachments = &renderPassColorAttachment;
+            renderPassDesc.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
+            renderPassDesc.colorAttachments = colorAttachments.data();
 
             wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
             {

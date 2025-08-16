@@ -1,5 +1,5 @@
 #include "CreateSurface.hpp"
-#include "webgpu.hpp"
+#include "WebGPU.hpp"
 #include "Window.hpp"
 #include <glfw3webgpu.h>
 

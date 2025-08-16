@@ -35,15 +35,13 @@ namespace ES::Plugin::ImGUI {
 				info.RenderTargetFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
 				info.Device = core.GetResource<wgpu::Device>();
 				ImGui_ImplWGPU_Init(&info);
-			}
-		);
-
-		RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
+			},
 			[](ES::Engine::Core &core) {
-				ES::Plugin::WebGPU::Util::CustomRenderPass(core,
+				auto &renderGraph = core.GetResource<RenderGraph>();
+				renderGraph.AddRenderPass(
 					RenderPassData{
 						.name = "GUIRenderPass",
-						.outputColorTextureName = "WindowColorTexture",
+						.outputColorTextureName = {"WindowColorTexture"},
 						.outputDepthTextureName = "WindowDepthTexture",
 						.loadOp = wgpu::LoadOp::Load,
 						.uniqueRenderCallback = Util::RenderGUI

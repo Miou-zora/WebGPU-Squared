@@ -11,7 +11,8 @@ struct Mesh {
 	wgpu::Buffer pointBuffer = nullptr;
 	wgpu::Buffer indexBuffer = nullptr;
 	std::string pipelineName = "NONE";
-	std::vector<entt::hashed_string> textures;
+	std::vector<std::string> passNames = {};
+	std::vector<entt::hashed_string> textures = {};
 	uint32_t indexCount = 0;
 	bool enabled = true;
 

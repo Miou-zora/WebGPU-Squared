@@ -14,6 +14,12 @@ struct Texture {
 
 	Texture() = default;
 
+	Texture(wgpu::Device &device, wgpu::TextureFormat format_, wgpu::Texture texture_, wgpu::TextureView textureView_, wgpu::BindGroupLayout bindGroupLayout)
+		: format(format_), texture(texture_), textureView(textureView_) {
+			this->sampler = CreateSampler(device);
+			this->bindGroup = CreateBindGroup(device, bindGroupLayout);
+		}
+
 	Texture(wgpu::Device &device, const std::filesystem::path &path, wgpu::BindGroupLayout bindGroupLayout) {
 		int width, height, channels;
 	    unsigned char *pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 4 /* force 4 channels */);
