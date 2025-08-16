@@ -184,7 +184,7 @@ class CameraPlugin : public ES::Engine::APlugin {
 							cameraData.yaw = drag.originYaw + delta.x;
 							cameraData.pitch = drag.originPitch + delta.y;
 							cameraData.pitch = glm::clamp(cameraData.pitch, -glm::half_pi<float>() + 1e-5f, glm::half_pi<float>() - 1e-5f);
-							drag.velocity = delta - drag.previousDelta;
+							drag.velocity = (delta - drag.previousDelta) * 100.0f;
 							drag.previousDelta = delta;
 						}
 					});
