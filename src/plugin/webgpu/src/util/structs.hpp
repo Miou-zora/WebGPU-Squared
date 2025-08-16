@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include "webgpu.hpp"
 #include "Object.hpp"
+#include "Mesh.hpp"
 
 #include "stb_image.h"
 
@@ -73,6 +74,7 @@ struct Uniforms2D {
 
 constexpr size_t MAX_LIGHTS = 16;
 
+// TODO: store them is resource
 inline wgpu::Buffer uniformBuffer = nullptr;
 inline wgpu::Buffer uniform2DBuffer = nullptr;
 inline wgpu::Buffer lightsBuffer = nullptr;
@@ -80,6 +82,7 @@ inline wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus
 inline wgpu::Texture textureToRelease = nullptr;
 inline wgpu::TextureView textureView = nullptr;
 inline wgpu::TextureView depthTextureView = nullptr;
+inline wgpu::Buffer cameraBuffer = nullptr;
 
 struct BindGroupsLinks {
 	enum class AssetType {
@@ -91,12 +94,13 @@ struct BindGroupsLinks {
 };
 
 struct WindowResizeCallbacks {
-	std::map<std::string, std::function<void(ES::Engine::Core &, int width, int height)>> callbacks;
+	std::list<std::function<void(ES::Engine::Core &, int width, int height)>> callbacks;
 };
 
 struct RenderPassData {
 	std::string name;
-	std::optional<std::string> pipelineName;
+	std::optional<std::string> shaderName;
+	PipelineType pipelineType;
 	wgpu::LoadOp loadOp = wgpu::LoadOp::Load;
 	std::optional<std::function<glm::vec4(ES::Engine::Core &)>> clearColor; // 0 to 1 range, nullptr if load operation is not clear
 	std::list<std::string> dependsOn;

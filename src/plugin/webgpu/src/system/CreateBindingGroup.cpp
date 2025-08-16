@@ -5,7 +5,7 @@ namespace ES::Plugin::WebGPU::System {
 void CreateBindingGroup(ES::Engine::Core &core)
 {
 	auto &device = core.GetResource<wgpu::Device>();
-	auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
+	auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["Lighting"];
 	//TODO: Put this in a separate system
 	//TODO: Should we separate this from pipelineData?
 	auto &bindGroups = core.RegisterResource(BindGroups());
@@ -35,7 +35,7 @@ void CreateBindingGroup(ES::Engine::Core &core)
 	wgpu::BindGroupEntry bindingLights(wgpu::Default);
 	bindingLights.binding = 0;
 	bindingLights.buffer = lightsBuffer;
-	bindingLights.size = sizeof(Light) + sizeof(uint32_t) + 12 /* (padding) */; // TODO: Resize when adding a new light
+	bindingLights.size = sizeof(Light) + sizeof(uint32_t) + 12;
 
 	std::array<wgpu::BindGroupEntry, 1> lightsBindings = { bindingLights };
 

@@ -16,12 +16,12 @@ static void onResize(GLFWwindow* window, int width, int height) {
 	auto &core = *corePtr;
 	auto &callbacks = core.GetResource<WindowResizeCallbacks>();
 
-	for (auto &[name, callback] : callbacks.callbacks) {
+	for (auto &callback : callbacks.callbacks) {
 		// TODO: should be have a try-catch here or just a basic call ?
 		try {
 			callback(core, width, height);
 		} catch (const std::exception &e) {
-			ES::Utils::Log::Error(fmt::format("Error in resize callback '{}': {}", name, e.what()));
+			ES::Utils::Log::Error(fmt::format("Error in resize callback: {}", e.what()));
 		}
 	}
 }
@@ -42,7 +42,7 @@ void SetupResizableWindow(ES::Engine::Core &core) {
 	core.GetResource<ES::Plugin::Window::Resource::Window>().SetResizable(true);
 	core.GetResource<ES::Plugin::Window::Resource::Window>().SetFramebufferSizeCallback(&core, onResize);
 
-	windowResizeCallbacks.callbacks["updateSurface"] = updateSurface;
+	windowResizeCallbacks.callbacks.push_back(updateSurface);
 }
 
 }

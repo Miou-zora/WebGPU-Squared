@@ -5,12 +5,14 @@
 #include "util/webgpu.hpp"
 #include <entt/entt.hpp>
 #include "Core.hpp"
+#include "PipelineType.hpp"
 
 namespace ES::Plugin::WebGPU::Component {
 struct Mesh {
 	wgpu::Buffer pointBuffer = nullptr;
 	wgpu::Buffer indexBuffer = nullptr;
 	std::string pipelineName = "NONE";
+	PipelineType pipelineType = PipelineType::None;
 	std::vector<std::string> passNames = {};
 	std::vector<entt::hashed_string> textures = {};
 	uint32_t indexCount = 0;

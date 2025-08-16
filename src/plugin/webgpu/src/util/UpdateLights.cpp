@@ -7,7 +7,7 @@ namespace ES::Plugin::WebGPU::Util {
 void UpdateLights(ES::Engine::Core &core)
 {
     auto &device = core.GetResource<wgpu::Device>();
-    auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["3D"];
+    auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["Lighting"];
     auto &bindGroups = core.GetResource<BindGroups>();
     auto &queue = core.GetResource<wgpu::Queue>();
     auto &lights = core.GetResource<std::vector<Light>>();

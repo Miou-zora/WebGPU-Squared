@@ -34,10 +34,12 @@
 #include "InitDepthBuffer.hpp"
 #include "InitializePipeline.hpp"
 #include "Initialize2DPipeline.hpp"
+#include "InitializeDeferredPipeline.hpp"
 #include "InitBuffers.hpp"
 #include "Create2DPipelineBuffer.hpp"
 #include "CreateBindingGroup.hpp"
 #include "CreateBindingGroup2D.hpp"
+#include "CreateBindingGroupDeferred.hpp"
 #include "SetupResizableWindow.hpp"
 
 // To GPU

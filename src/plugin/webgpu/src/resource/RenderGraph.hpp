@@ -71,40 +71,39 @@ class RenderGraph {
 
             wgpu::RenderPassEncoder renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
-            // Select which render pipeline to use
-            if (renderPassData.pipelineName.has_value()) {
-                PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines[renderPassData.pipelineName.value()];
+            if (renderPassData.shaderName.has_value()) {
+                PipelineData &pipelineData = core.GetResource<Pipelines>().renderPipelines[renderPassData.shaderName.value()];
                 renderPass.setPipeline(pipelineData.pipeline);
-            }
 
-            for (const BindGroupsLinks &link : renderPassData.bindGroups) {
-                auto name = link.name;
-                if (link.type == BindGroupsLinks::AssetType::BindGroup) {
-                    auto &bindGroups = core.GetResource<BindGroups>();
-                    if (bindGroups.groups.contains(name)) {
-                        renderPass.setBindGroup(link.groupIndex, bindGroups.groups[name], 0, nullptr);
+                for (const BindGroupsLinks &link : renderPassData.bindGroups) {
+                    auto name = link.name;
+                    if (link.type == BindGroupsLinks::AssetType::BindGroup) {
+                        auto &bindGroups = core.GetResource<BindGroups>();
+                        if (bindGroups.groups.contains(name)) {
+                            renderPass.setBindGroup(link.groupIndex, bindGroups.groups[name], 0, nullptr);
+                        } else {
+                            ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Bind group with name '{}' not found.", renderPassData.name, name));
+                        }
+                    } else if (link.type == BindGroupsLinks::AssetType::TextureView) {
+                        auto &textures = core.GetResource<TextureManager>();
+                        auto textureID = entt::hashed_string(name.c_str());
+                        if (textures.Contains(textureID)) {
+                            auto &texture = textures.Get(textureID);
+                            renderPass.setBindGroup(link.groupIndex, texture.bindGroup, 0, nullptr);
+                        } else {
+                            ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Texture with name '{}' not found.", renderPassData.name, name));
+                        }
                     } else {
-                        ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Bind group with name '{}' not found.", renderPassData.name, name));
+                        ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Unknown BindGroupsLinks type.", renderPassData.name));
                     }
-                } else if (link.type == BindGroupsLinks::AssetType::TextureView) {
-                    auto &textures = core.GetResource<TextureManager>();
-                    auto textureID = entt::hashed_string(name.c_str());
-                    if (textures.Contains(textureID)) {
-                        auto &texture = textures.Get(textureID);
-                        renderPass.setBindGroup(link.groupIndex, texture.bindGroup, 0, nullptr);
-                    } else {
-                        ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Texture with name '{}' not found.", renderPassData.name, name));
-                    }
-                } else {
-                    ES::Utils::Log::Error(fmt::format("CreateRenderPass::{}: Unknown BindGroupsLinks type.", renderPassData.name));
                 }
             }
-
-            if (renderPassData.uniqueRenderCallback.has_value()) {
+            // Select which render pipeline to use
+            if (renderPassData.uniqueRenderCallback.has_value()) { // Find a way to handle this properly, PS: this is used for ImGUI
                 renderPassData.uniqueRenderCallback.value()(renderPass, core);
             } else {
                 core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-                    if (!mesh.enabled || mesh.pipelineName != renderPassData.pipelineName) return;
+                    if (!mesh.enabled || mesh.pipelineType != renderPassData.pipelineType) return;
 
                     const auto &transformMatrix = transform.getTransformationMatrix();
                     queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));

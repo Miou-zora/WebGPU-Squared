@@ -1,11 +1,10 @@
-#include "InitializePipeline.hpp"
+#include "InitializeDeferredPipeline.hpp"
 #include "WebGPU.hpp"
 #include "Window.hpp"
 
-
 namespace ES::Plugin::WebGPU::System {
 
-void InitializePipeline(ES::Engine::Core &core)
+void InitializeDeferredPipeline(ES::Engine::Core &core)
 {
 	wgpu::Device device = core.GetResource<wgpu::Device>();
 	wgpu::TextureFormat surfaceFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
@@ -13,7 +12,7 @@ void InitializePipeline(ES::Engine::Core &core)
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize pipeline.");
 
 	wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
-	std::string wgslSource = loadFile("shader.wgsl");
+	std::string wgslSource = loadFile("shaderDeferred.wgsl");
 	wgslDesc.code = wgpu::StringView(wgslSource);
 
 	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
@@ -22,40 +21,41 @@ void InitializePipeline(ES::Engine::Core &core)
 
 	wgpu::ShaderModule shaderModule = device.createShaderModule(shaderDesc);
 	wgpu::RenderPipelineDescriptor pipelineDesc(wgpu::Default);
-	pipelineDesc.label = wgpu::StringView("My Render Pipeline");
+	pipelineDesc.label = wgpu::StringView("My Deferred Render Pipeline");
 	wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
 
-	std::vector<wgpu::VertexAttribute> vertexAttribs(3);
-
-    // Describe the position attribute
-    vertexAttribs[0].shaderLocation = 0;
-    vertexAttribs[0].format = wgpu::VertexFormat::Float32x3;
-    vertexAttribs[0].offset = 0;
-
-    // Describe the color attribute
-    vertexAttribs[1].shaderLocation = 1;
-    vertexAttribs[1].format = wgpu::VertexFormat::Float32x3;
-    vertexAttribs[1].offset = 3 * sizeof(float);
-
-	// Describe the texture coordinate attribute
-	vertexAttribs[2].shaderLocation = 2;
-	vertexAttribs[2].format = wgpu::VertexFormat::Float32x2;
-	vertexAttribs[2].offset = 6 * sizeof(float);
+	std::vector<wgpu::VertexAttribute> vertexAttribs(0);
 
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 8 * sizeof(float);
+    vertexBufferLayout.arrayStride = 0;
     vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
 
 	// TODO: find why it does not work with wgpu::BindGroupLayoutEntry
-	WGPUBindGroupLayoutEntry bindingLayout = {0};
-	bindingLayout.binding = 0;
-	bindingLayout.visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
-	bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
-	bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
+	// NORMAL
+	WGPUBindGroupLayoutEntry bindingLayoutNormal = {0};
+	bindingLayoutNormal.binding = 0;
+	bindingLayoutNormal.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutNormal.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+	bindingLayoutNormal.texture.viewDimension = wgpu::TextureViewDimension::_2D;
 
-	std::array<WGPUBindGroupLayoutEntry, 1> bindings = { bindingLayout };
+	// ALBEDO
+	WGPUBindGroupLayoutEntry bindingLayoutAlbedo = {0};
+	bindingLayoutAlbedo.binding = 1;
+	bindingLayoutAlbedo.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutAlbedo.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+	bindingLayoutAlbedo.texture.viewDimension = wgpu::TextureViewDimension::_2D;
+
+	// DEPTH
+	WGPUBindGroupLayoutEntry bindingLayoutDepth = {0};
+	bindingLayoutDepth.binding = 2;
+	bindingLayoutDepth.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutDepth.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+	bindingLayoutDepth.texture.viewDimension = wgpu::TextureViewDimension::_2D;
+
+
+	std::array<WGPUBindGroupLayoutEntry, 3> bindings = { bindingLayoutNormal, bindingLayoutAlbedo, bindingLayoutDepth };
 
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
 	bindGroupLayoutDesc.entryCount = bindings.size();
@@ -77,14 +77,28 @@ void InitializePipeline(ES::Engine::Core &core)
 	bindGroupLayoutDescLights.label = wgpu::StringView("Lights Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayoutLights = device.createBindGroupLayout(bindGroupLayoutDescLights);
 
-	std::array<WGPUBindGroupLayout, 2> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights};
+	WGPUBindGroupLayoutEntry bindingLayoutCamera = {0};
+	bindingLayoutCamera.binding = 0;
+	bindingLayoutCamera.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutCamera.buffer.type = wgpu::BufferBindingType::Uniform;
+	bindingLayoutCamera.buffer.minBindingSize = sizeof(glm::mat4) * 2 + sizeof(glm::vec3) + sizeof(float);
+
+	std::array<WGPUBindGroupLayoutEntry, 1> bindingsCamera = { bindingLayoutCamera };
+
+	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDescCamera(wgpu::Default);
+	bindGroupLayoutDescCamera.entryCount = bindingsCamera.size();
+	bindGroupLayoutDescCamera.entries = bindingsCamera.data();
+	bindGroupLayoutDescCamera.label = wgpu::StringView("Camera Bind Group Layout");
+	wgpu::BindGroupLayout bindGroupLayoutCamera = device.createBindGroupLayout(bindGroupLayoutDescCamera);
+
+	std::array<WGPUBindGroupLayout, 3> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera};
 
 	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
 	layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
 	layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
 	wgpu::PipelineLayout layout = device.createPipelineLayout(layoutDesc);
 
-    pipelineDesc.vertex.bufferCount = 1;
+    pipelineDesc.vertex.bufferCount = 0;
     pipelineDesc.vertex.buffers = &vertexBufferLayout;
 	pipelineDesc.vertex.module = shaderModule;
     pipelineDesc.vertex.entryPoint = wgpu::StringView("vs_main");
@@ -122,9 +136,9 @@ void InitializePipeline(ES::Engine::Core &core)
 
 	shaderModule.release();
 
-	core.GetResource<Pipelines>().renderPipelines["Lighting"] = PipelineData{
+	core.GetResource<Pipelines>().renderPipelines["Deferred"] = PipelineData{
 		.pipeline = pipeline,
-		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights},
+		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera},
 		.layout = layout,
 	};
 }

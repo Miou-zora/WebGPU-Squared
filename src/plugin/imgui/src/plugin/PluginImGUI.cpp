@@ -9,6 +9,7 @@
 #include "RenderingPipeline.hpp"
 #include "Window.hpp"
 #include "RenderGUI.hpp"
+#include "PipelineType.hpp"
 
 namespace ES::Plugin::ImGUI {
     namespace WebGPU {
@@ -44,6 +45,7 @@ namespace ES::Plugin::ImGUI {
 						.outputColorTextureName = {"WindowColorTexture"},
 						.outputDepthTextureName = "WindowDepthTexture",
 						.loadOp = wgpu::LoadOp::Load,
+						.pipelineType = PipelineType::None, // Custom one
 						.uniqueRenderCallback = Util::RenderGUI
 					}
 				);

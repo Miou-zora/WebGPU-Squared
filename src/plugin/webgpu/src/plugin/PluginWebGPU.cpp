@@ -13,10 +13,11 @@ struct Uniforms {
 struct Camera {
     glm::mat4 viewProjectionMatrix;
     glm::mat4 invViewProjectionMatrix;
+    glm::vec3 position;
+    float _padding;
 };
 
 wgpu::Buffer uniformsBuffer;
-wgpu::Buffer cameraBuffer;
 
 namespace ES::Plugin::WebGPU {
 void Plugin::Bind() {
@@ -51,6 +52,7 @@ void Plugin::Bind() {
         System::InitDepthBuffer,
         System::InitializePipeline,
         System::Initialize2DPipeline,
+        System::InitializeDeferredPipeline,
         System::InitializeBuffers,
         System::Create2DPipelineBuffer,
         System::CreateBindingGroup,
@@ -59,14 +61,16 @@ void Plugin::Bind() {
         [](ES::Engine::Core &core) {
             stbi_set_flip_vertically_on_load(true);
         },
-
         [](ES::Engine::Core &core) {
             wgpu::Device device = core.GetResource<wgpu::Device>();
 			auto &pipelines = core.GetResource<Pipelines>();
+            auto &textureManager = core.GetResource<TextureManager>();
             auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 
             int frameBufferSizeX, frameBufferSizeY;
             glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
+
+            auto &textureNormal = textureManager.Add("gBufferTexture2DFloat16");
 
             wgpu::TextureDescriptor textureDesc(wgpu::Default);
             textureDesc.label = wgpu::StringView("gBufferTexture2DFloat16");
@@ -74,21 +78,17 @@ void Plugin::Bind() {
             textureDesc.format = wgpu::TextureFormat::RGBA16Float;
             textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
 
-            auto texture = device.createTexture(textureDesc);
+            textureNormal.texture = device.createTexture(textureDesc);
+            textureNormal.textureView = textureNormal.texture.createView();
 
-            core.GetResource<TextureManager>().Add("gBufferTexture2DFloat16",
-                device,
-                wgpu::TextureFormat::RGBA16Float,
-                texture,
-                texture.createView(),
-                pipelines.renderPipelines["2D"].bindGroupLayouts[1]
-            );
-            core.GetResource<WindowResizeCallbacks>().callbacks["updategBufferTexture2DFloat16"] = [](ES::Engine::Core &core, int width, int height) {
+            core.GetResource<WindowResizeCallbacks>().callbacks.push_back([](ES::Engine::Core &core, int width, int height) {
                 auto &textureManager = core.GetResource<TextureManager>();
                 auto &pipelines = core.GetResource<Pipelines>();
                 auto &device = core.GetResource<wgpu::Device>();
 
                 textureManager.Remove("gBufferTexture2DFloat16");
+
+                auto &textureNormal = textureManager.Add("gBufferTexture2DFloat16");
 
                 wgpu::TextureDescriptor textureDesc(wgpu::Default);
                 textureDesc.label = wgpu::StringView("gBufferTexture2DFloat16");
@@ -96,41 +96,27 @@ void Plugin::Bind() {
                 textureDesc.format = wgpu::TextureFormat::RGBA16Float;
                 textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
 
-                auto gBufferTexture2DFloat16 = device.createTexture(textureDesc);
-                auto gBufferTexture2DFloat16View = gBufferTexture2DFloat16.createView();
-
-                textureManager.Add("gBufferTexture2DFloat16",
-                    device,
-                    wgpu::TextureFormat::RGBA16Float,
-                    gBufferTexture2DFloat16,
-                    gBufferTexture2DFloat16View,
-                    pipelines.renderPipelines["2D"].bindGroupLayouts[1]
-                );
-            };
-            // Texture &gBufferTextureAlbedo = core.GetResource<TextureManager>().Add("gBufferTextureAlbedo");
+                textureNormal.texture = device.createTexture(textureDesc);
+                textureNormal.textureView = textureNormal.texture.createView();
+            });
+            Texture &textureAlbedo = core.GetResource<TextureManager>().Add("gBufferTextureAlbedo");
 
             textureDesc.label = wgpu::StringView("gBufferTextureAlbedo");
             textureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1 };
             textureDesc.format = wgpu::TextureFormat::BGRA8Unorm;
             textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
 
-            auto gBufferTextureAlbedoTexture = device.createTexture(textureDesc);
-            auto gBufferTextureAlbedoTextureView = gBufferTextureAlbedoTexture.createView();
+            textureAlbedo.texture = device.createTexture(textureDesc);
+            textureAlbedo.textureView = textureAlbedo.texture.createView();
 
-            core.GetResource<TextureManager>().Add("gBufferTextureAlbedo",
-                device,
-                wgpu::TextureFormat::BGRA8Unorm,
-                gBufferTextureAlbedoTexture,
-                gBufferTextureAlbedoTextureView,
-                pipelines.renderPipelines["2D"].bindGroupLayouts[1]
-            );
-
-            core.GetResource<WindowResizeCallbacks>().callbacks["updategBufferTextureAlbedo"] = [](ES::Engine::Core &core, int width, int height) {
+            core.GetResource<WindowResizeCallbacks>().callbacks.push_back([](ES::Engine::Core &core, int width, int height) {
                 auto &textureManager = core.GetResource<TextureManager>();
                 auto &pipelines = core.GetResource<Pipelines>();
                 auto &device = core.GetResource<wgpu::Device>();
 
                 textureManager.Remove("gBufferTextureAlbedo");
+
+                auto &textureAlbedo = textureManager.Add("gBufferTextureAlbedo");
 
                 wgpu::TextureDescriptor textureDesc(wgpu::Default);
                 textureDesc.label = wgpu::StringView("gBufferTextureAlbedo");
@@ -141,14 +127,9 @@ void Plugin::Bind() {
                 auto gBufferTextureAlbedoTexture = device.createTexture(textureDesc);
                 auto gBufferTextureAlbedoTextureView = gBufferTextureAlbedoTexture.createView();
 
-                textureManager.Add("gBufferTextureAlbedo",
-                    device,
-                    wgpu::TextureFormat::BGRA8Unorm,
-                    gBufferTextureAlbedoTexture,
-                    gBufferTextureAlbedoTextureView,
-                    pipelines.renderPipelines["2D"].bindGroupLayouts[1]
-                );
-            };
+                textureAlbedo.texture = gBufferTextureAlbedoTexture;
+                textureAlbedo.textureView = gBufferTextureAlbedoTextureView;
+            });
 
             Texture &depthTexture = core.GetResource<TextureManager>().Add("depthTexture");
 
@@ -159,6 +140,25 @@ void Plugin::Bind() {
 
             depthTexture.texture = device.createTexture(textureDesc);
             depthTexture.textureView = depthTexture.texture.createView();
+
+            core.GetResource<WindowResizeCallbacks>().callbacks.push_back([&depthTexture](ES::Engine::Core &core, int width, int height) {
+                auto &textureManager = core.GetResource<TextureManager>();
+                auto &pipelines = core.GetResource<Pipelines>();
+                auto &device = core.GetResource<wgpu::Device>();
+
+                textureManager.Remove("depthTexture");
+
+                auto &depthTexture = textureManager.Add("depthTexture");
+
+                wgpu::TextureDescriptor textureDesc(wgpu::Default);
+                textureDesc.label = wgpu::StringView("depthTexture");
+                textureDesc.size = { static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 };
+                textureDesc.format = wgpu::TextureFormat::Depth24Plus;
+                textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
+
+                depthTexture.texture = device.createTexture(textureDesc);
+                depthTexture.textureView = depthTexture.texture.createView();
+            });
         },
         [](ES::Engine::Core &core) {
             auto &device = core.GetResource<wgpu::Device>();
@@ -214,7 +214,7 @@ void Plugin::Bind() {
             bindingLayoutCamera.binding = 1;
             bindingLayoutCamera.visibility = wgpu::ShaderStage::Vertex;
             bindingLayoutCamera.buffer.type = wgpu::BufferBindingType::Uniform;
-            bindingLayoutCamera.buffer.minBindingSize = sizeof(glm::mat4) * 2;
+            bindingLayoutCamera.buffer.minBindingSize = sizeof(glm::mat4) * 2 + sizeof(glm::vec3) + sizeof(float);
 
             std::array<WGPUBindGroupLayoutEntry, 2> uniformsBindings = { bindingLayout, bindingLayoutCamera };
 
@@ -313,6 +313,7 @@ void Plugin::Bind() {
             camera.invViewProjectionMatrix = glm::mat4(1.0f);
             queue.writeBuffer(cameraBuffer, 0, &camera, sizeof(camera));
         },
+        System::CreateBindingGroupDeferred,
         [](ES::Engine::Core &core) {
             auto &device = core.GetResource<wgpu::Device>();
             auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["GBuffer"];
@@ -350,14 +351,15 @@ void Plugin::Bind() {
                 RenderPassData{
                     .name = "GBuffer",
                     .outputColorTextureName = {"gBufferTexture2DFloat16", "gBufferTextureAlbedo"},
-                    .outputDepthTextureName = "WindowDepthTexture",
+                    .outputDepthTextureName = "depthTexture",
                     .loadOp = wgpu::LoadOp::Clear,
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "GBuffer" },
                     },
-                    .pipelineName = "GBuffer",
+                    .shaderName = "GBuffer",
+                    .pipelineType = PipelineType::_3D,
                     .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-                        return glm::vec4(0, 0, 1, 0);
+                        return glm::vec4(0, 0, 0, 0);
                     },
                     .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
                         wgpu::Queue queue = core.GetResource<wgpu::Queue>();
@@ -370,38 +372,62 @@ void Plugin::Bind() {
                     }
                 }
             );
+            // core.GetResource<RenderGraph>().AddRenderPass(
+            //     RenderPassData{
+            //         .name = "Lighting",
+            //         .outputColorTextureName = {"WindowColorTexture"},
+            //         .outputDepthTextureName = "WindowDepthTexture",
+            //         .loadOp = wgpu::LoadOp::Clear,
+            //         .bindGroups = {
+            //             { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
+            //             { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
+            //         },
+            //         .shaderName = "Lighting",
+            //         .pipelineType = PipelineType::_3D,
+            //         .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
+            //             auto &clearColor = core.GetResource<ClearColor>().value;
+            //             return glm::vec4(
+            //                 clearColor.r,
+            //                 clearColor.g,
+            //                 clearColor.b,
+            //                 clearColor.a
+            //             );
+            //         }
+            //     }
+            // );
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
-                    .name = "3DRenderPass",
+                    .name = "Deferred",
                     .outputColorTextureName = {"WindowColorTexture"},
                     .outputDepthTextureName = "WindowDepthTexture",
                     .loadOp = wgpu::LoadOp::Clear,
                     .bindGroups = {
-                        { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
-                        { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
+                        { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup0" },
+                        { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" },
+                        { .groupIndex = 2, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup2" }
                     },
-                    .pipelineName = "3D",
+                    .shaderName = "Deferred",
+                    .pipelineType = PipelineType::_3D,
                     .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
                         auto &clearColor = core.GetResource<ClearColor>().value;
-                        return glm::vec4(
-                            clearColor.r,
-                            clearColor.g,
-                            clearColor.b,
-                            clearColor.a
-                        );
+                        return glm::vec4(0.1, 0.2, 0.3, 1.0);
+                    },
+                    .uniqueRenderCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core) {
+                        renderPass.draw(6, 1, 0, 0);
                     }
                 }
             );
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
-                    .name = "2DRenderPass",
+                    .name = "2D",
                     .outputColorTextureName = {"WindowColorTexture"},
                     .outputDepthTextureName = "WindowDepthTexture",
                     .loadOp = wgpu::LoadOp::Load,
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
                     },
-                    .pipelineName = "2D",
+                    .shaderName = "2D",
+                    .pipelineType = PipelineType::_2D,
                     .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
                         auto &textures = core.GetResource<TextureManager>();
                         auto texture = textures.Get(mesh.textures[0]);
@@ -437,6 +463,7 @@ void Plugin::Bind() {
             Camera cameraBuf;
             cameraBuf.viewProjectionMatrix = projectionMatrix * viewMatrix;
             cameraBuf.invViewProjectionMatrix = glm::inverse(cameraBuf.viewProjectionMatrix);
+            cameraBuf.position = camData.position;
             queue.writeBuffer(cameraBuffer, 0, &cameraBuf, sizeof(cameraBuf));
         },
         System::GenerateSurfaceTexture,
