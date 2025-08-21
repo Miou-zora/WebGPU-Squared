@@ -318,41 +318,6 @@ auto main(int ac, char **av) -> int
 			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 			entity.AddComponent<Name>(core, "Sprite Example");
 		},
-		// [](ES::Engine::Core &core) {
-		// 	auto entity = ES::Engine::Entity(core.CreateEntity());
-		// 	auto &pipelines = core.GetResource<Pipelines>();
-
-		// 	std::vector<glm::vec3> vertices;
-		// 	std::vector<glm::vec3> normals;
-		// 	std::vector<glm::vec2> texCoords;
-		// 	std::vector<uint32_t> indices;
-
-		// 	ES::Plugin::WebGPU::Util::CreateSprite(glm::vec2(250.f, 0.f), glm::vec2(300.0f, 240.0f), vertices, normals, texCoords, indices);
-
-		// 	auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
-		// 	mesh.pipelineType = PipelineType::_2D;
-		// 	mesh.textures.push_back(entt::hashed_string("gBufferTexture2DFloat16"));
-		// 	entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
-		// 	entity.AddComponent<Name>(core, "gBufferTexture2DFloat16");
-		// },
-
-		// [](ES::Engine::Core &core) {
-		// 	auto entity = ES::Engine::Entity(core.CreateEntity());
-		// 	auto &pipelines = core.GetResource<Pipelines>();
-
-		// 	std::vector<glm::vec3> vertices;
-		// 	std::vector<glm::vec3> normals;
-		// 	std::vector<glm::vec2> texCoords;
-		// 	std::vector<uint32_t> indices;
-
-		// 	ES::Plugin::WebGPU::Util::CreateSprite(glm::vec2(250.f, -300.f), glm::vec2(300.0f, 240.0f), vertices, normals, texCoords, indices);
-
-		// 	auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
-		// 	mesh.pipelineType = PipelineType::_2D;
-		// 	mesh.textures.push_back(entt::hashed_string("gBufferTextureAlbedo"));
-		// 	entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
-		// 	entity.AddComponent<Name>(core, "gBufferTextureAlbedo");
-		// },
 		[](ES::Engine::Core &core) {
 			auto entity = ES::Engine::Entity(core.CreateEntity());
 
@@ -379,7 +344,7 @@ auto main(int ac, char **av) -> int
 
 			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 			mesh.pipelineType = PipelineType::_2D;
-			mesh.textures.push_back(entt::hashed_string("sprite_example_2"));
+			// mesh.textures.push_back(entt::hashed_string("sprite_example_2"));
 			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 			entity.AddComponent<Name>(core, "Sprite Example 2");
 		}

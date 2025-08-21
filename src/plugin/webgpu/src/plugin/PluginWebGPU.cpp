@@ -59,6 +59,19 @@ void Plugin::Bind() {
         System::CreateBindingGroup2D,
         System::SetupResizableWindow,
         [](ES::Engine::Core &core) {
+            auto &textureManager = core.GetResource<TextureManager>();
+			auto &pipelines = core.GetResource<Pipelines>();
+			textureManager.Add(entt::hashed_string("DEFAULT_TEXTURE"), core.GetResource<wgpu::Device>(), glm::uvec2(2, 2), [](glm::uvec2 pos) {
+				glm::u8vec4 color;
+                // Checkerboard pattern of pink
+				color.r = ((pos.x + pos.y) % 2 == 0) ? 255 : 0;
+				color.g = 0;
+				color.b = ((pos.x + pos.y) % 2 == 0) ? 255 : 0;
+				color.a = 255;
+				return color;
+			}, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+        },
+        [](ES::Engine::Core &core) {
             stbi_set_flip_vertically_on_load(true);
         },
         [](ES::Engine::Core &core) {
@@ -224,7 +237,25 @@ void Plugin::Bind() {
             bindGroupLayoutDesc.label = wgpu::StringView("Uniforms Bind Group Layout");
             wgpu::BindGroupLayout uniformsBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
-            std::array<WGPUBindGroupLayout, 1> bindGroupLayouts = { uniformsBindGroupLayout };
+            WGPUBindGroupLayoutEntry textureBindingLayout = {0};
+            textureBindingLayout.binding = 0;
+            textureBindingLayout.visibility = wgpu::ShaderStage::Fragment;
+            textureBindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
+            textureBindingLayout.texture.viewDimension = wgpu::TextureViewDimension::_2D;
+
+            WGPUBindGroupLayoutEntry samplerBindingLayout = {0};
+            samplerBindingLayout.binding = 1;
+            samplerBindingLayout.visibility = wgpu::ShaderStage::Fragment;
+            samplerBindingLayout.sampler.type = wgpu::SamplerBindingType::Filtering;
+
+            std::array<WGPUBindGroupLayoutEntry, 2> textureBindings = { textureBindingLayout, samplerBindingLayout };
+
+            bindGroupLayoutDesc.entryCount = textureBindings.size();
+            bindGroupLayoutDesc.entries = textureBindings.data();
+            bindGroupLayoutDesc.label = wgpu::StringView("Texture Bind Group Layout");
+            wgpu::BindGroupLayout textureBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+
+            std::array<WGPUBindGroupLayout, 2> bindGroupLayouts = { uniformsBindGroupLayout, textureBindGroupLayout };
 
             wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
             layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
@@ -282,7 +313,8 @@ void Plugin::Bind() {
             core.GetResource<Pipelines>().renderPipelines["GBuffer"] = PipelineData{
                 .pipeline = pipeline,
                 .bindGroupLayouts = {
-                    uniformsBindGroupLayout
+                    uniformsBindGroupLayout,
+                    textureBindGroupLayout
                 },
                 .layout = layout,
             };
@@ -355,6 +387,7 @@ void Plugin::Bind() {
                     .loadOp = wgpu::LoadOp::Clear,
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "GBuffer" },
+                        { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
                     },
                     .shaderName = "GBuffer",
                     .pipelineType = PipelineType::_3D,
@@ -369,32 +402,17 @@ void Plugin::Bind() {
                         uniforms.normalModelMatrix = glm::transpose(glm::inverse(uniforms.modelMatrix));
 
                         queue.writeBuffer(uniformsBuffer, 0, &uniforms, sizeof(uniforms));
+
+                        auto &textures = core.GetResource<TextureManager>();
+                        entt::hashed_string textureName = entt::hashed_string("DEFAULT_TEXTURE");
+                        if (mesh.textures.size() > 0 && textures.Contains(mesh.textures[0])) {
+                            textureName = mesh.textures[0];
+                        }
+                        auto texture = textures.Get(textureName);
+                        renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
                     }
                 }
             );
-            // core.GetResource<RenderGraph>().AddRenderPass(
-            //     RenderPassData{
-            //         .name = "Lighting",
-            //         .outputColorTextureName = {"WindowColorTexture"},
-            //         .outputDepthTextureName = "WindowDepthTexture",
-            //         .loadOp = wgpu::LoadOp::Clear,
-            //         .bindGroups = {
-            //             { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "1" },
-            //             { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" }
-            //         },
-            //         .shaderName = "Lighting",
-            //         .pipelineType = PipelineType::_3D,
-            //         .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-            //             auto &clearColor = core.GetResource<ClearColor>().value;
-            //             return glm::vec4(
-            //                 clearColor.r,
-            //                 clearColor.g,
-            //                 clearColor.b,
-            //                 clearColor.a
-            //             );
-            //         }
-            //     }
-            // );
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
                     .name = "Deferred",
@@ -430,7 +448,11 @@ void Plugin::Bind() {
                     .pipelineType = PipelineType::_2D,
                     .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
                         auto &textures = core.GetResource<TextureManager>();
-                        auto texture = textures.Get(mesh.textures[0]);
+                        entt::hashed_string textureName = entt::hashed_string("DEFAULT_TEXTURE");
+                        if (mesh.textures.size() > 0 && textures.Contains(mesh.textures[0])) {
+                            textureName = mesh.textures[0];
+                        }
+                        auto texture = textures.Get(textureName);
                         renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
                     }
                 }
