@@ -269,6 +269,17 @@ auto main(int ac, char **av) -> int
 		[](ES::Engine::Core &core) {
 			auto entity = ES::Engine::Entity(core.CreateEntity());
 
+			auto &textureManager = core.GetResource<TextureManager>();
+			auto &pipelines = core.GetResource<Pipelines>();
+			textureManager.Add(entt::hashed_string("sponza_texture"), core.GetResource<wgpu::Device>(), glm::uvec2(1, 1), [](glm::uvec2 pos) {
+				glm::u8vec4 color;
+				color.r = 255;
+				color.g = 255;
+				color.b = 255;
+				color.a = 255; // a
+				return color;
+			}, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+
 			std::vector<glm::vec3> vertices;
 			std::vector<glm::vec3> normals;
 			std::vector<glm::vec2> texCoords;
@@ -279,6 +290,7 @@ auto main(int ac, char **av) -> int
 
 			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 			mesh.pipelineType = PipelineType::_3D;
+			mesh.textures.push_back(entt::hashed_string("sponza_texture"));
 			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 			entity.AddComponent<Name>(core, "Sponza");
 		},
