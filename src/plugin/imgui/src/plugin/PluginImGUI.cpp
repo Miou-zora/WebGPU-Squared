@@ -42,10 +42,10 @@ namespace ES::Plugin::ImGUI {
 				renderGraph.AddRenderPass(
 					RenderPassData{
 						.name = "GUIRenderPass",
+						.pipelineType = PipelineType::None, // Custom one
+						.loadOp = wgpu::LoadOp::Load,
 						.outputColorTextureName = {"WindowColorTexture"},
 						.outputDepthTextureName = "WindowDepthTexture",
-						.loadOp = wgpu::LoadOp::Load,
-						.pipelineType = PipelineType::None, // Custom one
 						.uniqueRenderCallback = Util::RenderGUI
 					}
 				);

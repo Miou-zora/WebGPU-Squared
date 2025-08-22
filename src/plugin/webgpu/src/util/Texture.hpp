@@ -4,6 +4,7 @@
 #include "stb_image.h"
 #include <filesystem>
 #include <glm/glm.hpp>
+#include <array>
 
 struct Texture {
 	wgpu::Texture texture = nullptr;

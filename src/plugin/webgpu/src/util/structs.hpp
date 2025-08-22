@@ -85,12 +85,12 @@ inline wgpu::TextureView depthTextureView = nullptr;
 inline wgpu::Buffer cameraBuffer = nullptr;
 
 struct BindGroupsLinks {
+	uint32_t groupIndex; // Index of the bind group in the pipeline
 	enum class AssetType {
 		BindGroup, // often used for pur data like uniforms
 		TextureView,
 	} type;
 	std::string name; // In case of usage global
-	uint32_t groupIndex; // Index of the bind group in the pipeline
 };
 
 struct WindowResizeCallbacks {

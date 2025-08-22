@@ -382,17 +382,17 @@ void Plugin::Bind() {
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
                     .name = "GBuffer",
+                    .shaderName = "GBuffer",
+                    .pipelineType = PipelineType::_3D,
+                    .loadOp = wgpu::LoadOp::Clear,
+                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
+                        return glm::vec4(0, 0, 0, 0);
+                    },
                     .outputColorTextureName = {"gBufferTexture2DFloat16", "gBufferTextureAlbedo"},
                     .outputDepthTextureName = "depthTexture",
-                    .loadOp = wgpu::LoadOp::Clear,
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "GBuffer" },
                         { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
-                    },
-                    .shaderName = "GBuffer",
-                    .pipelineType = PipelineType::_3D,
-                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-                        return glm::vec4(0, 0, 0, 0);
                     },
                     .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
                         wgpu::Queue queue = core.GetResource<wgpu::Queue>();
@@ -416,19 +416,19 @@ void Plugin::Bind() {
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
                     .name = "Deferred",
+                    .shaderName = "Deferred",
+                    .pipelineType = PipelineType::_3D,
+                    .loadOp = wgpu::LoadOp::Clear,
+                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
+                        auto &clearColor = core.GetResource<ClearColor>().value;
+                        return glm::vec4(0.1, 0.2, 0.3, 1.0);
+                    },
                     .outputColorTextureName = {"WindowColorTexture"},
                     .outputDepthTextureName = "WindowDepthTexture",
-                    .loadOp = wgpu::LoadOp::Clear,
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup0" },
                         { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" },
                         { .groupIndex = 2, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup2" }
-                    },
-                    .shaderName = "Deferred",
-                    .pipelineType = PipelineType::_3D,
-                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-                        auto &clearColor = core.GetResource<ClearColor>().value;
-                        return glm::vec4(0.1, 0.2, 0.3, 1.0);
                     },
                     .uniqueRenderCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core) {
                         renderPass.draw(6, 1, 0, 0);
@@ -438,14 +438,14 @@ void Plugin::Bind() {
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
                     .name = "2D",
+                    .shaderName = "2D",
+                    .pipelineType = PipelineType::_2D,
+                    .loadOp = wgpu::LoadOp::Load,
                     .outputColorTextureName = {"WindowColorTexture"},
                     .outputDepthTextureName = "WindowDepthTexture",
-                    .loadOp = wgpu::LoadOp::Load,
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
                     },
-                    .shaderName = "2D",
-                    .pipelineType = PipelineType::_2D,
                     .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
                         auto &textures = core.GetResource<TextureManager>();
                         entt::hashed_string textureName = entt::hashed_string("DEFAULT_TEXTURE");
