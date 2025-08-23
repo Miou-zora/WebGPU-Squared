@@ -17,6 +17,20 @@ struct MyUniforms {
     float time;
 };
 
+
+struct Uniforms {
+    glm::mat4 modelMatrix;
+    glm::mat4 normalModelMatrix;
+};
+
+struct Camera {
+    glm::mat4 viewProjectionMatrix;
+    glm::mat4 invViewProjectionMatrix;
+    glm::vec3 position;
+    float _padding;
+};
+
+
 // This assert should stay here as we want this rule to link struct to webgpu struct
 static_assert(sizeof(MyUniforms) % 16 == 0);
 
@@ -79,6 +93,8 @@ inline wgpu::Buffer uniform2DBuffer = nullptr;
 inline wgpu::Buffer lightsBuffer = nullptr;
 inline wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 inline wgpu::Buffer cameraBuffer = nullptr;
+inline wgpu::Buffer transformsBuffer = nullptr;
+inline wgpu::Buffer uniformsBuffer = nullptr; // GBuffer uniforms
 
 struct BindGroupsLinks {
 	uint32_t groupIndex; // Index of the bind group in the pipeline
