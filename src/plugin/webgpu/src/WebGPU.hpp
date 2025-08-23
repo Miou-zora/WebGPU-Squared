@@ -31,6 +31,7 @@
 #include "ConfigureSurface.hpp"
 #include "ReleaseAdapter.hpp"
 #include "InspectDevice.hpp"
+#include "GenerateDefaultTexture.hpp"
 #include "InitDepthBuffer.hpp"
 #include "InitializePipeline.hpp"
 #include "Initialize2DPipeline.hpp"
@@ -48,6 +49,7 @@
 
 // To GPU
 #include "UpdateBuffers.hpp"
+#include "UpdateCameraBuffer.hpp"
 #include "GenerateSurfaceTexture.hpp"
 
 // Draw

@@ -42,18 +42,7 @@ void Plugin::Bind() {
         System::CreateBindingGroup,
         System::CreateBindingGroup2D,
         System::SetupResizableWindow,
-        [](ES::Engine::Core &core) {
-            auto &textureManager = core.GetResource<TextureManager>();
-            auto &pipelines = core.GetResource<Pipelines>();
-            textureManager.Add(entt::hashed_string("DEFAULT_TEXTURE"), core.GetResource<wgpu::Device>(), glm::uvec2(2, 2), [](glm::uvec2 pos) {
-                glm::u8vec4 color;
-                color.r = ((pos.x + pos.y) % 2 == 0) ? 255 : 0;
-                color.g = 0;
-                color.b = ((pos.x + pos.y) % 2 == 0) ? 255 : 0;
-                color.a = 255;
-                return color;
-            }, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
-        },
+        System::GenerateDefaultTexture,
         [](ES::Engine::Core &core) { stbi_set_flip_vertically_on_load(true); },
         System::InitGBufferTextures,
         System::InitializeGBufferPipeline,
@@ -143,33 +132,7 @@ void Plugin::Bind() {
     );
     RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
         System::UpdateBuffers,
-        [](ES::Engine::Core &core) {
-            // update cameraBuffer
-            wgpu::Queue queue = core.GetResource<wgpu::Queue>();
-            auto &camData = core.GetResource<CameraData>();
-
-            auto viewMatrix = glm::lookAt(
-                camData.position,
-                camData.position + glm::vec3(
-                    glm::cos(camData.yaw) * glm::cos(camData.pitch),
-                    glm::sin(camData.pitch),
-                    glm::sin(camData.yaw) * glm::cos(camData.pitch)
-                ),
-                camData.up
-            );
-
-            auto projectionMatrix = glm::perspective(
-                camData.fovY,
-                camData.aspectRatio,
-                camData.nearPlane,
-                camData.farPlane
-            );
-            Camera cameraBuf;
-            cameraBuf.viewProjectionMatrix = projectionMatrix * viewMatrix;
-            cameraBuf.invViewProjectionMatrix = glm::inverse(cameraBuf.viewProjectionMatrix);
-            cameraBuf.position = camData.position;
-            queue.writeBuffer(cameraBuffer, 0, &cameraBuf, sizeof(cameraBuf));
-        },
+        System::UpdateCameraBuffer,
         System::GenerateSurfaceTexture,
         [](ES::Engine::Core &core) {
             core.GetResource<RenderGraph>().Execute(core);
