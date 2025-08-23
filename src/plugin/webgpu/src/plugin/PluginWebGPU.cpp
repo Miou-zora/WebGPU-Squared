@@ -2,7 +2,6 @@
 #include "RenderingPipeline.hpp"
 #include "Entity.hpp"
 #include "Window.hpp"
-
 #include "WebGPU.hpp"
 
 struct Uniforms {
@@ -329,6 +328,7 @@ void Plugin::Bind() {
             wgpu::BufferDescriptor bufferDesc(wgpu::Default);
             bufferDesc.size = sizeof(Uniforms);
             bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+            bufferDesc.label = wgpu::StringView("Uniforms Buffer for GBuffer");
             uniformsBuffer = device.createBuffer(bufferDesc);
 
             Uniforms uniforms;
@@ -338,6 +338,7 @@ void Plugin::Bind() {
 
             bufferDesc.size = sizeof(Camera);
             bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+            bufferDesc.label = wgpu::StringView("Camera Buffer for GBuffer");
             cameraBuffer = device.createBuffer(bufferDesc);
 
             Camera camera;

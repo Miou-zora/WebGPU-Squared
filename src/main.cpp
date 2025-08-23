@@ -267,32 +267,36 @@ auto main(int ac, char **av) -> int
 			});
 		},
 		[](ES::Engine::Core &core) {
-			auto entity = ES::Engine::Entity(core.CreateEntity());
 
-			auto &textureManager = core.GetResource<TextureManager>();
-			auto &pipelines = core.GetResource<Pipelines>();
-			textureManager.Add(entt::hashed_string("sponza_texture"), core.GetResource<wgpu::Device>(), glm::uvec2(1, 1), [](glm::uvec2 pos) {
-				glm::u8vec4 color;
-				color.r = 255;
-				color.g = 255;
-				color.b = 255;
-				color.a = 255; // a
-				return color;
-			}, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+			std::vector<Shape> shapes;
 
-			std::vector<glm::vec3> vertices;
-			std::vector<glm::vec3> normals;
-			std::vector<glm::vec2> texCoords;
-			std::vector<uint32_t> indices;
-
-			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/sponza.obj", vertices, normals, texCoords, indices);
+			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/sponza.obj", shapes);
 			if (!success) throw std::runtime_error("Model cant be loaded");
 
-			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
-			mesh.pipelineType = PipelineType::_3D;
-			mesh.textures.push_back(entt::hashed_string("sponza_texture"));
-			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
-			entity.AddComponent<Name>(core, "Sponza");
+			for (size_t i = 0; i < shapes.size(); i++) {
+				const auto &shape = shapes[i];
+
+				auto entity = ES::Engine::Entity(core.CreateEntity());
+
+				auto &textureManager = core.GetResource<TextureManager>();
+				auto &pipelines = core.GetResource<Pipelines>();
+				std::string textureName = fmt::format("sponza_texture_{}", i);
+				textureManager.Add(entt::hashed_string(textureName.c_str()), core.GetResource<wgpu::Device>(), glm::uvec2(1, 1), [](glm::uvec2 pos) {
+					glm::u8vec4 color;
+					// random color
+					color.r = static_cast<uint8_t>(rand() % 256);
+					color.g = static_cast<uint8_t>(rand() % 256);
+					color.b = static_cast<uint8_t>(rand() % 256);
+					color.a = 255; // a
+					return color;
+				}, pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+
+				auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, shape.vertices, shape.normals, shape.texCoords, shape.indices);
+				mesh.pipelineType = PipelineType::_3D;
+				mesh.textures.push_back(entt::hashed_string(textureName.c_str()));
+				entity.AddComponent<ES::Plugin::Object::Component::Transform>(core);
+				entity.AddComponent<Name>(core, fmt::format("Sponza {}", i));
+			}
 		},
 		[](ES::Engine::Core &core) {
 			auto entity = ES::Engine::Entity(core.CreateEntity());
@@ -307,7 +311,7 @@ auto main(int ac, char **av) -> int
 
 			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 			mesh.pipelineType = PipelineType::_3D;
-			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
+			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core);
 			entity.AddComponent<Name>(core, "Finish");
 		},
 		[](ES::Engine::Core &core) {
