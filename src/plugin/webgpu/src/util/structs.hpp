@@ -72,7 +72,6 @@ struct Uniforms2D {
 	glm::mat4 orthoMatrix;
 };
 
-constexpr size_t MAX_LIGHTS = 16;
 
 // TODO: store them is resource
 inline wgpu::Buffer uniformBuffer = nullptr;
