@@ -79,9 +79,6 @@ inline wgpu::Buffer uniformBuffer = nullptr;
 inline wgpu::Buffer uniform2DBuffer = nullptr;
 inline wgpu::Buffer lightsBuffer = nullptr;
 inline wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
-inline wgpu::Texture textureToRelease = nullptr;
-inline wgpu::TextureView textureView = nullptr;
-inline wgpu::TextureView depthTextureView = nullptr;
 inline wgpu::Buffer cameraBuffer = nullptr;
 
 struct BindGroupsLinks {

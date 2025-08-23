@@ -1,9 +1,10 @@
 #pragma once
 
 #include "webgpu.hpp"
+#include "Core.hpp"
 
 namespace ES::Plugin::WebGPU::Util {
 
-wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface);
+void GetNextSurfaceViewData(ES::Engine::Core &core, wgpu::Surface &surface);
 
 }

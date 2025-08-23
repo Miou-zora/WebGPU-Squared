@@ -3,9 +3,6 @@
 
 namespace ES::Plugin::WebGPU::System {
 void TerminateDepthBuffer(ES::Engine::Core &core) {
-	if (depthTextureView) {
-		depthTextureView.release();
-		depthTextureView = nullptr;
-	}
+
 }
 }

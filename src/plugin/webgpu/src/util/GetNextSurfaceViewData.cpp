@@ -3,28 +3,37 @@
 
 namespace ES::Plugin::WebGPU::Util {
 
-wgpu::TextureView GetNextSurfaceViewData(wgpu::Surface &surface){
+void GetNextSurfaceViewData(ES::Engine::Core &core, wgpu::Surface &surface){
 	wgpu::SurfaceTexture surfaceTexture(wgpu::Default);
 	surface.getCurrentTexture(&surfaceTexture);
 	if (
 	    surfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal && // NEW
 	    surfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal
 	) {
-	    return nullptr;
+	    throw std::runtime_error("Failed to get current surface texture");
 	}
-	wgpu::Texture texture = surfaceTexture.texture;
+	wgpu::Texture texturewgpu = surfaceTexture.texture;
 
 	// Create a view for this surface texture
 	wgpu::TextureViewDescriptor viewDescriptor(wgpu::Default);
 	viewDescriptor.label = wgpu::StringView("Surface texture view");
-	viewDescriptor.format = texture.getFormat();
+	viewDescriptor.format = texturewgpu.getFormat();
 	viewDescriptor.dimension = wgpu::TextureViewDimension::_2D;
 	viewDescriptor.mipLevelCount = 1;
 	viewDescriptor.arrayLayerCount = 1;
-	wgpu::TextureView targetView = texture.createView(viewDescriptor);
+	wgpu::TextureView targetView = texturewgpu.createView(viewDescriptor);
 
-	textureToRelease = texture;
+	if (targetView == nullptr) throw std::runtime_error("Could not get next surface texture view");
 
-	return targetView;
+	if (core.GetResource<TextureManager>().Contains("WindowColorTexture")) {
+		Texture &texture = core.GetResource<TextureManager>().Get("WindowColorTexture");
+		texture.textureView = targetView;
+		texture.texture = texturewgpu;
+	} else {
+		Texture texture;
+		texture.textureView = targetView;
+		texture.texture = texturewgpu;
+		core.GetResource<TextureManager>().Add("WindowColorTexture", texture);
+	}
 }
 }

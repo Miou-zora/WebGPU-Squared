@@ -15,24 +15,23 @@ void InitDepthBuffer(ES::Engine::Core &core) {
 	int frameBufferSizeX, frameBufferSizeY;
 	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 
+	Texture depthTextureViewData;
+
 	wgpu::TextureDescriptor depthTextureDesc(wgpu::Default);
 	depthTextureDesc.label = wgpu::StringView("Z Buffer");
 	depthTextureDesc.usage = wgpu::TextureUsage::RenderAttachment;
 	depthTextureDesc.size = { static_cast<uint32_t>(frameBufferSizeX), static_cast<uint32_t>(frameBufferSizeY), 1u };
 	depthTextureDesc.format = depthTextureFormat;
-	wgpu::Texture depthTexture = device.createTexture(depthTextureDesc);
 
-	depthTextureView = depthTexture.createView();
-
-	Texture depthTextureViewData;
-
-	depthTextureViewData.textureView = depthTextureView;
+	depthTextureViewData.texture = device.createTexture(depthTextureDesc);
+	depthTextureViewData.textureView = depthTextureViewData.texture.createView();
 
 	if (textureManager.Contains("WindowDepthTexture")) {
-		textureManager.Get("WindowDepthTexture") = depthTextureViewData;
+		Texture &depthTexture = textureManager.Get("WindowDepthTexture");
+		depthTexture.texture = depthTextureViewData.texture;
+		depthTexture.textureView = depthTextureViewData.textureView;
 	} else {
 		textureManager.Add("WindowDepthTexture", depthTextureViewData);
 	}
-	depthTexture.release();
 }
 }
