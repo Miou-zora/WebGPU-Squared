@@ -28,9 +28,7 @@ Mesh::Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const
 
 	wgpu::BufferDescriptor bufferDesc(wgpu::Default);
 	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
-	bufferDesc.mappedAtCreation = false;
 	bufferDesc.size = pointData.size() * sizeof(float);
-	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
 	pointBuffer = device.createBuffer(bufferDesc);
 
 	queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
@@ -38,10 +36,14 @@ Mesh::Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const
 	bufferDesc.size = indexData.size() * sizeof(uint32_t);
 	bufferDesc.size = (bufferDesc.size + 3) & ~3;
 	indexData.resize((indexData.size() + 1) & ~1);
-	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
+	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index;
 	indexBuffer = device.createBuffer(bufferDesc);
 
 	queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
+
+	bufferDesc.size = sizeof(uint32_t);
+	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
+	transformIndexBuffer = device.createBuffer(bufferDesc);
 }
 
 void Mesh::Release() {

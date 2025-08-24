@@ -25,37 +25,48 @@ void InitializeGBufferPipeline(ES::Engine::Core &core) {
     shaderDesc.nextInChain = &wgslDesc.chain;
     shaderDesc.label = wgpu::StringView("Shader source GBuffer");
     wgpu::ShaderModule shaderModule = device.createShaderModule(shaderDesc);
-    wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
 
     std::vector<wgpu::VertexAttribute> vertexAttribs(3);
-    vertexAttribs[0].shaderLocation = 0; vertexAttribs[0].offset = 0; vertexAttribs[0].format = wgpu::VertexFormat::Float32x3;
-    vertexAttribs[1].shaderLocation = 1; vertexAttribs[1].offset = 3 * sizeof(float); vertexAttribs[1].format = wgpu::VertexFormat::Float32x3;
-    vertexAttribs[2].shaderLocation = 2; vertexAttribs[2].offset = 6 * sizeof(float); vertexAttribs[2].format = wgpu::VertexFormat::Float32x2;
+    vertexAttribs[0].shaderLocation = 0;
+    vertexAttribs[0].offset = 0;
+    vertexAttribs[0].format = wgpu::VertexFormat::Float32x3;
+    vertexAttribs[1].shaderLocation = 1;
+    vertexAttribs[1].offset = 3 * sizeof(float);
+    vertexAttribs[1].format = wgpu::VertexFormat::Float32x3;
+    vertexAttribs[2].shaderLocation = 2;
+    vertexAttribs[2].offset = 6 * sizeof(float);
+    vertexAttribs[2].format = wgpu::VertexFormat::Float32x2;
 
+    wgpu::VertexBufferLayout vertexBufferLayout(wgpu::Default);
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
     vertexBufferLayout.arrayStride = (8 * sizeof(float));
     vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
 
-    WGPUBindGroupLayoutEntry bindingLayout = {0};
-    bindingLayout.binding = 0;
-    bindingLayout.visibility = wgpu::ShaderStage::Vertex;
-    bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
-    bindingLayout.buffer.minBindingSize = sizeof(glm::mat4) * 2;
+    std::vector<wgpu::VertexAttribute> vertexAttribsUniformsIndex(1);
+    vertexAttribsUniformsIndex[0].shaderLocation = 3;
+    vertexAttribsUniformsIndex[0].offset = 0;
+    vertexAttribsUniformsIndex[0].format = wgpu::VertexFormat::Uint32;
+
+    wgpu::VertexBufferLayout vertexBufferLayoutUniformsIndex(wgpu::Default);
+    vertexBufferLayoutUniformsIndex.attributeCount = static_cast<uint32_t>(vertexAttribsUniformsIndex.size());
+    vertexBufferLayoutUniformsIndex.attributes = vertexAttribsUniformsIndex.data();
+    vertexBufferLayoutUniformsIndex.arrayStride = sizeof(uint32_t);
+    vertexBufferLayoutUniformsIndex.stepMode = wgpu::VertexStepMode::Instance;
 
     WGPUBindGroupLayoutEntry bindingLayoutCamera = {0};
-    bindingLayoutCamera.binding = 1;
+    bindingLayoutCamera.binding = 0;
     bindingLayoutCamera.visibility = wgpu::ShaderStage::Vertex;
     bindingLayoutCamera.buffer.type = wgpu::BufferBindingType::Uniform;
     bindingLayoutCamera.buffer.minBindingSize = sizeof(glm::mat4) * 2 + sizeof(glm::vec3) + sizeof(float);
 
-    std::array<WGPUBindGroupLayoutEntry, 2> uniformsBindings = { bindingLayout, bindingLayoutCamera };
+    std::array<WGPUBindGroupLayoutEntry, 1> cameraBindings = { bindingLayoutCamera };
 
     wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
-    bindGroupLayoutDesc.entryCount = uniformsBindings.size();
-    bindGroupLayoutDesc.entries = uniformsBindings.data();
-    bindGroupLayoutDesc.label = wgpu::StringView("Uniforms Bind Group Layout");
-    wgpu::BindGroupLayout uniformsBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+    bindGroupLayoutDesc.entryCount = cameraBindings.size();
+    bindGroupLayoutDesc.entries = cameraBindings.data();
+    bindGroupLayoutDesc.label = wgpu::StringView("Camera Bind Group Layout");
+    wgpu::BindGroupLayout cameraBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
     WGPUBindGroupLayoutEntry textureBindingLayout = {0};
     textureBindingLayout.binding = 0;
@@ -75,15 +86,30 @@ void InitializeGBufferPipeline(ES::Engine::Core &core) {
     bindGroupLayoutDesc.label = wgpu::StringView("Texture Bind Group Layout");
     wgpu::BindGroupLayout textureBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
-    std::array<WGPUBindGroupLayout, 2> bindGroupLayouts = { uniformsBindGroupLayout, textureBindGroupLayout };
+    WGPUBindGroupLayoutEntry bindingLayoutUniforms = {0};
+    bindingLayoutUniforms.binding = 0;
+    bindingLayoutUniforms.visibility = wgpu::ShaderStage::Vertex;
+    bindingLayoutUniforms.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+    bindingLayoutUniforms.buffer.minBindingSize = sizeof(glm::mat4) * 2;
+
+    std::array<WGPUBindGroupLayoutEntry, 1> uniformsBindings = { bindingLayoutUniforms };
+
+    bindGroupLayoutDesc.entryCount = uniformsBindings.size();
+    bindGroupLayoutDesc.entries = uniformsBindings.data();
+    bindGroupLayoutDesc.label = wgpu::StringView("Uniforms Bind Group Layout");
+    wgpu::BindGroupLayout uniformsBindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+
+    std::array<WGPUBindGroupLayout, 3> bindGroupLayouts = { cameraBindGroupLayout, textureBindGroupLayout, uniformsBindGroupLayout };
 
     wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
     layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
     layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
     wgpu::PipelineLayout layout = device.createPipelineLayout(layoutDesc);
 
-    pipelineDesc.vertex.bufferCount = 1;
-    pipelineDesc.vertex.buffers = &vertexBufferLayout;
+    std::array<WGPUVertexBufferLayout, 2> vertexBuffers = { vertexBufferLayout, vertexBufferLayoutUniformsIndex };
+
+    pipelineDesc.vertex.bufferCount = vertexBuffers.size();
+    pipelineDesc.vertex.buffers = vertexBuffers.data();
     pipelineDesc.vertex.module = shaderModule;
     pipelineDesc.vertex.entryPoint = wgpu::StringView("vs_main");
 
@@ -115,7 +141,7 @@ void InitializeGBufferPipeline(ES::Engine::Core &core) {
 
     core.GetResource<Pipelines>().renderPipelines["GBuffer"] = PipelineData{
         .pipeline = pipeline,
-        .bindGroupLayouts = { uniformsBindGroupLayout, textureBindGroupLayout },
+        .bindGroupLayouts = { cameraBindGroupLayout, textureBindGroupLayout, uniformsBindGroupLayout },
         .layout = layout,
     };
 }

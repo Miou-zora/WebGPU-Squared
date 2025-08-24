@@ -6,7 +6,8 @@
 // TODO: check learn webgpu c++ why I had this variable
 uint32_t uniformStride = 0;
 
-float cameraScale = 100.0f;
+float cameraScale = 1.0f;
+float cameraSpeed = 3.0f;
 
 struct DragState {
     bool active = false;
@@ -71,7 +72,7 @@ static void MovementSystem(ES::Engine::Core &core)
 			forwardDir * movementForce.z +
 			downDir * movementForce.y +
 			rightDir * movementForce.x;
-		cameraData.position += movementDirection * 1.f * cameraScale * core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
+		cameraData.position += movementDirection * cameraSpeed * cameraScale * core.GetScheduler<ES::Engine::Scheduler::Update>().GetDeltaTime();
 	}
 
 }
@@ -214,7 +215,7 @@ auto main(int ac, char **av) -> int
 
 			auto size = window.GetSize();
 
-			cameraData.position = { -600.0f, 300.0f, 0.0f };
+			cameraData.position = { -6.0f, 3.0f, 0.0f };
 			cameraData.pitch = glm::radians(-35.0f);
 			cameraData.aspectRatio = static_cast<float>(size.x) / static_cast<float>(size.y);
 		},
@@ -225,29 +226,28 @@ auto main(int ac, char **av) -> int
 
 			lights.push_back({
 				.color = { 204.0f / 255.0f, 42.0f / 255.0f, 34.0f / 255.0f, 1.0f },
-				.direction = { 0.0f, 20.0f, 0.0f },
-				.intensity = 250.f,
+				.direction = { 0.0f, 0.2f, 0.0f },
+				.intensity = 2.5f,
 				.enabled = true
 			});
 
 			lights.push_back({
-				// .color = { 0.1f, 0.9f, 0.3f, 1.0f }, 136, 255, 36
 				.color = { 136.0f / 255.0f, 255.0f / 255.0f, 36.0f / 255.0f, 1.0f },
-				.direction = { -300.0f, 10.0f, 0.0f },
-				.intensity = 100.f,
+				.direction = { -3.0f, 0.1f, 0.0f },
+				.intensity = 1.f,
 				.enabled = true
 			});
 
 			lights.push_back({
 				.color = { 0.0f / 255.0f, 86.0f / 255.0f, 255.0f / 255.0f, 1.0f },
-				.direction = { 300.0f, 200.0f, 150.0f },
-				.intensity = 490.f,
+				.direction = { 3.0f, 2.0f, 1.5f },
+				.intensity = 4.9f,
 				.enabled = true
 			});
 
 			lights.push_back({
 				.color = { 255.0f / 255.0f, 134.0f / 255.0f, 82.0f / 255.0f, 1.0f },
-				.direction = { -125.0f, 55.0f, 32.0f },
+				.direction = { -1.25f, 0.55f, 0.32f },
 				.intensity = 0.4f,
 				.enabled = true,
 				.type = Light::Type::Directional
@@ -294,7 +294,7 @@ auto main(int ac, char **av) -> int
 				auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, shape.vertices, shape.normals, shape.texCoords, shape.indices);
 				mesh.pipelineType = PipelineType::_3D;
 				mesh.textures.push_back(entt::hashed_string(textureName.c_str()));
-				entity.AddComponent<ES::Plugin::Object::Component::Transform>(core);
+				entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0), glm::vec3(0.01f));
 				entity.AddComponent<Name>(core, fmt::format("Sponza {}", i));
 			}
 		},
@@ -311,7 +311,8 @@ auto main(int ac, char **av) -> int
 
 			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
 			mesh.pipelineType = PipelineType::_3D;
-			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core);
+			mesh.enabled = false;
+			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f), glm::vec3(1.f));
 			entity.AddComponent<Name>(core, "Finish");
 		},
 		[](ES::Engine::Core &core) {

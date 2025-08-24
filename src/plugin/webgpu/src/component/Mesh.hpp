@@ -11,6 +11,7 @@ namespace ES::Plugin::WebGPU::Component {
 struct Mesh {
 	wgpu::Buffer pointBuffer = nullptr;
 	wgpu::Buffer indexBuffer = nullptr;
+	wgpu::Buffer transformIndexBuffer = nullptr;
 	std::string pipelineName = "NONE";
 	PipelineType pipelineType = PipelineType::None;
 	std::vector<std::string> passNames = {};

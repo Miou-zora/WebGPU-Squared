@@ -95,6 +95,8 @@ inline wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus
 inline wgpu::Buffer cameraBuffer = nullptr;
 inline wgpu::Buffer transformsBuffer = nullptr;
 inline wgpu::Buffer uniformsBuffer = nullptr; // GBuffer uniforms
+inline uint32_t entityIndex = 0;
+
 
 struct BindGroupsLinks {
 	uint32_t groupIndex; // Index of the bind group in the pipeline

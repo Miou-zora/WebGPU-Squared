@@ -64,23 +64,20 @@ void Plugin::Bind() {
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "GBuffer" },
                         { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2D" },
+                        { .groupIndex = 2, .type = BindGroupsLinks::AssetType::BindGroup, .name = "GBufferUniforms" },
                     },
                     .perEntityCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform, ES::Engine::Entity entity) {
-                        wgpu::Queue queue = core.GetResource<wgpu::Queue>();
-
-                        Uniforms uniforms;
-                        uniforms.modelMatrix = transform.getTransformationMatrix();
-                        uniforms.normalModelMatrix = glm::transpose(glm::inverse(uniforms.modelMatrix));
-
-                        queue.writeBuffer(uniformsBuffer, 0, &uniforms, sizeof(uniforms));
-
+                        auto &queue = core.GetResource<wgpu::Queue>();
                         auto &textures = core.GetResource<TextureManager>();
                         entt::hashed_string textureName = entt::hashed_string("DEFAULT_TEXTURE");
                         if (mesh.textures.size() > 0 && textures.Contains(mesh.textures[0])) {
                             textureName = mesh.textures[0];
                         }
                         auto texture = textures.Get(textureName);
+                        queue.writeBuffer(mesh.transformIndexBuffer, 0, &entityIndex, sizeof(uint32_t));
+                        renderPass.setVertexBuffer(1, mesh.transformIndexBuffer, 0, sizeof(uint32_t));
                         renderPass.setBindGroup(1, texture.bindGroup, 0, nullptr);
+                        entityIndex++;
                     }
                 }
             );
@@ -133,6 +130,10 @@ void Plugin::Bind() {
     RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(
         System::UpdateBuffers,
         System::UpdateCameraBuffer,
+        [](ES::Engine::Core &core) {
+            entityIndex = 0;
+        },
+        System::UpdateBufferUniforms,
         System::GenerateSurfaceTexture,
         [](ES::Engine::Core &core) {
             core.GetResource<RenderGraph>().Execute(core);

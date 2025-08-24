@@ -51,6 +51,7 @@
 #include "UpdateBuffers.hpp"
 #include "UpdateCameraBuffer.hpp"
 #include "GenerateSurfaceTexture.hpp"
+#include "UpdateBufferUniforms.hpp"
 
 // Draw
 #include "Render.hpp"
