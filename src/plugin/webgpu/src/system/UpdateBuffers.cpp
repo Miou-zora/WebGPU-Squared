@@ -3,6 +3,9 @@
 #include "structs.hpp"
 #include "Window.hpp"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
+
 namespace ES::Plugin::WebGPU::System {
 
 void UpdateBuffers(ES::Engine::Core &core)
@@ -46,6 +49,25 @@ void UpdateBuffers(ES::Engine::Core &core)
 	auto &lights = core.GetResource<std::vector<Light>>();
 	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
 
+	for (auto &light : lights) {
+		if (light.type != Light::Type::Directional) continue;
+		auto &additionalDirectionalLight = additionalDirectionalLights[light.lightIndex];
+		
+		glm::vec3 lightDirection = glm::normalize(light.direction);
+		glm::vec3 posOfLight = -lightDirection * 50.0f;
+		
+		glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 60.0f);
+		
+		glm::vec3 target = glm::vec3(0.0f, 1.0f, 0.0f);
+		glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+		
+		glm::mat4 lightView = glm::lookAt(posOfLight, target, up);
+		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+		
+		additionalDirectionalLight.lightViewProj = lightSpaceMatrix;
+		light.lightViewProjMatrix = lightSpaceMatrix;
+		queue.writeBuffer(additionalDirectionalLight.buffer, 0, &additionalDirectionalLight.lightViewProj, sizeof(glm::mat4));
+	}
 	queue.writeBuffer(lightsBuffer, 0, &lightsCount, sizeof(uint32_t));
 	queue.writeBuffer(lightsBuffer, sizeof(uint32_t) + 12 /* (padding) */, lights.data(), sizeof(Light) * lights.size());
 

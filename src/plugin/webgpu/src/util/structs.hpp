@@ -35,6 +35,7 @@ struct Camera {
 static_assert(sizeof(MyUniforms) % 16 == 0);
 
 struct Light {
+	glm::mat4 lightViewProjMatrix; // 44 + 16 = 60
     glm::vec4 color; // 16
 	glm::vec3 direction; // 16 + 12 = 28
     float intensity; // 28 + 4 = 32
@@ -43,10 +44,21 @@ struct Light {
 		Directional,
 		Point
 	} type = Type::Point; // 36 + 4 = 40
-	char _padding[8] = {0}; // 40 + 8 = 48
+	uint32_t lightIndex = 0; // 40 + 4 = 44
+	char _padding[4] = {0}; // 60 + 4 = 64
 };
 
 static_assert(sizeof(Light) % 16 == 0, "Light struct must be 16 bytes for WebGPU alignment");
+
+struct AdditionalDirectionalLight {
+	glm::mat4 lightViewProj;
+	wgpu::BindGroup bindGroup = nullptr;
+	wgpu::Buffer buffer = nullptr;
+};
+inline wgpu::Sampler additionalDirectionalLightsSampler = nullptr;
+
+inline std::vector<AdditionalDirectionalLight> additionalDirectionalLights;
+
 
 struct CameraData {
 	glm::vec3 position = { 0.0f, 0.0f, 0.0f };
@@ -123,4 +135,14 @@ struct RenderPassData {
 	std::vector<BindGroupsLinks> bindGroups;
 	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core)>> uniqueRenderCallback = std::nullopt;
 	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &, ES::Plugin::Object::Component::Transform &, ES::Engine::Entity)>> perEntityCallback;
+};
+
+struct MultipleRenderPassData {
+	std::string name;
+	RenderPassData pass;
+	std::function<size_t(ES::Engine::Core &)> getNumberOfPass;
+	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> preMultiplePassCallback;
+	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> prePassCallback;
+	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> postPassCallback;
+	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> postMultiplePassCallback;
 };

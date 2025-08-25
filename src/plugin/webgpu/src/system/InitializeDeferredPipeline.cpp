@@ -17,7 +17,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 
 	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
     shaderDesc.nextInChain = &wgslDesc.chain; // connect the chained extension
-    shaderDesc.label = wgpu::StringView("Shader source from Application.cpp");
+    shaderDesc.label = wgpu::StringView("Shader source deferred");
 
 	wgpu::ShaderModule shaderModule = device.createShaderModule(shaderDesc);
 	wgpu::RenderPipelineDescriptor pipelineDesc(wgpu::Default);
@@ -54,7 +54,6 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	bindingLayoutDepth.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
 	bindingLayoutDepth.texture.viewDimension = wgpu::TextureViewDimension::_2D;
 
-
 	std::array<WGPUBindGroupLayoutEntry, 3> bindings = { bindingLayoutNormal, bindingLayoutAlbedo, bindingLayoutDepth };
 
 	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc(wgpu::Default);
@@ -62,6 +61,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	bindGroupLayoutDesc.entries = bindings.data();
 	bindGroupLayoutDesc.label = wgpu::StringView("My Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
+
 
 	WGPUBindGroupLayoutEntry bindingLayoutLights = {0};
 	bindingLayoutLights.binding = 0;
@@ -77,6 +77,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	bindGroupLayoutDescLights.label = wgpu::StringView("Lights Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayoutLights = device.createBindGroupLayout(bindGroupLayoutDescLights);
 
+
 	WGPUBindGroupLayoutEntry bindingLayoutCamera = {0};
 	bindingLayoutCamera.binding = 0;
 	bindingLayoutCamera.visibility = wgpu::ShaderStage::Fragment;
@@ -91,7 +92,28 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	bindGroupLayoutDescCamera.label = wgpu::StringView("Camera Bind Group Layout");
 	wgpu::BindGroupLayout bindGroupLayoutCamera = device.createBindGroupLayout(bindGroupLayoutDescCamera);
 
-	std::array<WGPUBindGroupLayout, 3> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera};
+
+	WGPUBindGroupLayoutEntry bindingLayoutShadows = {0};
+	bindingLayoutShadows.binding = 0;
+	bindingLayoutShadows.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutShadows.texture.sampleType = wgpu::TextureSampleType::Depth;
+	bindingLayoutShadows.texture.viewDimension = wgpu::TextureViewDimension::_2DArray;
+
+	WGPUBindGroupLayoutEntry samplerBindingLayout = {0};
+	samplerBindingLayout.binding = 1;
+	samplerBindingLayout.visibility = wgpu::ShaderStage::Fragment;
+	samplerBindingLayout.sampler.type = wgpu::SamplerBindingType::Comparison;
+
+	std::array<WGPUBindGroupLayoutEntry, 2> bindingsShadows = { bindingLayoutShadows, samplerBindingLayout};
+
+	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDescShadows(wgpu::Default);
+	bindGroupLayoutDescShadows.entryCount = bindingsShadows.size();
+	bindGroupLayoutDescShadows.entries = bindingsShadows.data();
+	bindGroupLayoutDescShadows.label = wgpu::StringView("Shadows Bind Group Layout");
+	wgpu::BindGroupLayout bindGroupLayoutShadows = device.createBindGroupLayout(bindGroupLayoutDescShadows);
+
+
+	std::array<WGPUBindGroupLayout, 4> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera, bindGroupLayoutShadows};
 
 	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
 	layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
@@ -138,7 +160,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 
 	core.GetResource<Pipelines>().renderPipelines["Deferred"] = PipelineData{
 		.pipeline = pipeline,
-		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera},
+		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera, bindGroupLayoutShadows},
 		.layout = layout,
 	};
 }

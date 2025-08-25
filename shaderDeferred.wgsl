@@ -14,21 +14,14 @@ fn vs_main(
 @group(0) @binding(1) var gBufferAlbedo: texture_2d<f32>;
 @group(0) @binding(2) var gBufferDepth: texture_2d<f32>;
 
-struct LightData {
-  position : vec4f,
-  color : vec3f,
-  radius : f32,
-}
-struct LightsBuffer {
-  lights: array<LightData>,
-}
-
 struct Light {
-    color: vec4f,
-    direction: vec3f,
-    intensity: f32,
-    enabled: u32,
-    light_type: u32,
+  lightViewProjMatrix: mat4x4f,
+  color: vec4f,
+  direction: vec3f,
+  intensity: f32,
+  enabled: u32,
+  light_type: u32,
+  lightIndex: u32,
 };
 
 struct Lights {
@@ -47,12 +40,53 @@ struct Camera {
 
 @group(2) @binding(0) var<uniform> camera: Camera;
 
+@group(3) @binding(0) var lightsDirectionalTextures: texture_depth_2d_array;
+@group(3) @binding(1) var lightsDirectionalTextureSampler: sampler_comparison;
+
+const shadowDepthTextureSize: f32 = 2048.0;
+
 fn world_from_screen_coord(coord : vec2f, depth_sample: f32) -> vec3f {
   // reconstruct world-space position from the screen coordinate.
   let posClip = vec4(coord.x * 2.0 - 1.0, (1.0 - coord.y) * 2.0 - 1.0, depth_sample, 1.0);
   let posWorldW = camera.invViewProjectionMatrix * posClip;
   let posWorld = posWorldW.xyz / posWorldW.www;
   return posWorld;
+}
+
+fn calculateDirectionalLight(light: Light, N: vec3f, V: vec3f, MatKd: vec3f, MatKs: vec3f, Shiness: f32, position: vec3f) -> vec3f
+{
+  let FragPosLightSpace = light.lightViewProjMatrix * vec4f(position, 1.0);
+  let shadowCoord = FragPosLightSpace.xyz / FragPosLightSpace.w;
+  let projCoord = shadowCoord * vec3f(0.5, -0.5, 1.0) + vec3f(0.5, 0.5, 0.0);
+
+  var visibility = 0.0;
+  let oneOverShadowDepthTextureSize = 1.0 / 2048.0;
+  for (var y = -3; y <= 3; y++) {
+    for (var x = -3; x <= 3; x++) {
+      let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
+
+      visibility += textureSampleCompare(
+        lightsDirectionalTextures, lightsDirectionalTextureSampler,
+        projCoord.xy + offset, i32(light.lightIndex), projCoord.z - 0.007
+      );
+    }
+  }
+  visibility /= 27.0;
+  if (visibility < 0.01) {
+    return vec3f(0.0);
+  }
+
+  let L = normalize(-light.direction);
+  let R = reflect(-L, N); // equivalent to 2.0 * dot(N, L) * N - L
+
+  let diffuse = max(0.0, dot(L, N)) * light.color.rgb * light.intensity;
+  // let diffuse = light.color.rgb;
+
+  // We clamp the dot product to 0 when it is negative
+  let RoV = max(0.0, dot(R, V));
+  let specular = pow(RoV, Shiness) * light.color.rgb * light.intensity;
+
+  return (MatKd * diffuse + MatKs * specular) * visibility;
 }
 
 @fragment
@@ -94,6 +128,8 @@ fn fs_main(
   let Shiness: f32 = 100.0;
 
 	var color = vec3f(0.0);
+  var visibility = 0.0;
+  let oneOverShadowDepthTextureSize = 1.0 / shadowDepthTextureSize;
   for (var i = 0u; i < uLights.numberOfLights; i++) {
     let light = uLights.lights[i];
 
@@ -102,17 +138,7 @@ fn fs_main(
         }
 
         if (light.light_type == 0u) { // Directional light
-            let L = normalize(light.direction);
-            let R = reflect(-L, N); // equivalent to 2.0 * dot(N, L) * N - L
-
-            let diffuse = max(0.0, dot(L, N)) * light.color.rgb * light.intensity;
-            // let diffuse = light.color.rgb;
-
-            // We clamp the dot product to 0 when it is negative
-            let RoV = max(0.0, dot(R, V));
-            let specular = pow(RoV, Shiness);
-
-            color += MatKd * diffuse + MatKs * specular;
+            color += calculateDirectionalLight(light, N, V, MatKd, MatKs, Shiness, position);
         } else if (light.light_type == 1u) { // Point light
             let lightDir = light.direction - position;
             let distance = length(lightDir);

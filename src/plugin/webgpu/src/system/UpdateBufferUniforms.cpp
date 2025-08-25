@@ -45,10 +45,6 @@ void ES::Plugin::WebGPU::System::UpdateBufferUniforms(ES::Engine::Core &core) {
 		uniforms.modelMatrix = transform.getTransformationMatrix();
 		uniforms.normalModelMatrix = glm::transpose(glm::inverse(uniforms.modelMatrix));
 		queue.writeBuffer(uniformsBuffer, offset, &uniforms, sizeof(uniforms));
-		if (ES::Engine::Entity(entity).HasComponents<Name>(core)) {
-			auto &name = ES::Engine::Entity(entity).GetComponents<Name>(core);
-			std::cout << "A.      Entity Name: " << name.value << " " << offset / sizeof(uniforms) << std::endl;
-		}
 		offset += sizeof(uniforms);
 	});
 

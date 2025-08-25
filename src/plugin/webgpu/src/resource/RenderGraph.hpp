@@ -10,12 +10,32 @@ class RenderGraph {
         ~RenderGraph() = default;
 
         void AddRenderPass(const RenderPassData& passData) {
-            nodes.push_back(passData);
+            order.push_back({ "RenderPassData", singleRenderPasses.size() });
+            singleRenderPasses.push_back(passData);
+        }
+
+        void AddMultipleRenderPass(const MultipleRenderPassData& passesData) {
+            order.push_back({ "MultipleRenderPassData", multipleRenderPasses.size() });
+            multipleRenderPasses.push_back(passesData);
         }
 
         void Execute(ES::Engine::Core &core) {
-            for (const auto& pass : nodes) {
-                executePass(pass, core);
+            for (const auto& [type, index] : order) {
+                if (type == "RenderPassData") {
+                    executePass(singleRenderPasses[index], core);
+                } else if (type == "MultipleRenderPassData") {
+                    auto &multiplePass = multipleRenderPasses[index];
+                    // TODO: find a way to have a better resource management than ugly and unsafe std::function
+                    if (multiplePass.preMultiplePassCallback.has_value()) multiplePass.preMultiplePassCallback.value()(core, multiplePass.pass);
+                    for (size_t i = 0; i < multiplePass.getNumberOfPass(core); i++) {
+                        if (multiplePass.prePassCallback.has_value()) multiplePass.prePassCallback.value()(core, multiplePass.pass);
+                        executePass(multiplePass.pass, core);
+                        if (multiplePass.postPassCallback.has_value()) multiplePass.postPassCallback.value()(core, multiplePass.pass);
+                    }
+                    if (multiplePass.postMultiplePassCallback.has_value()) multiplePass.postMultiplePassCallback.value()(core, multiplePass.pass);
+                } else {
+                    throw std::runtime_error("Unknown render graph node type.");
+                }
             }
         }
 
@@ -29,6 +49,8 @@ class RenderGraph {
             encoderDesc.label = wgpu::StringView(encoderDescLabel);
             auto commandEncoder = device.createCommandEncoder(encoderDesc);
             if (commandEncoder == nullptr) throw std::runtime_error(fmt::format("CreateRenderPass::{}::Command encoder is not created, cannot draw sprite.", renderPassData.name));
+
+            std::vector<wgpu::CommandBuffer> commandBuffers;
 
             wgpu::RenderPassDescriptor renderPassDesc(wgpu::Default);
             std::string renderPassDescLabel = fmt::format("CreateRenderPass::{}::RenderPass", renderPassData.name);
@@ -105,16 +127,12 @@ class RenderGraph {
                 core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto e, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
                     if (!mesh.enabled || mesh.pipelineType != renderPassData.pipelineType) return;
 
-                    const auto &transformMatrix = transform.getTransformationMatrix();
-                    queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, modelMatrix), &transformMatrix, sizeof(MyUniforms::modelMatrix));
-
                     if (renderPassData.perEntityCallback.has_value()) {
                         renderPassData.perEntityCallback.value()(renderPass, core, mesh, transform, ES::Engine::Entity(e));
                     }
 
                     renderPass.setVertexBuffer(0, mesh.pointBuffer, 0, mesh.pointBuffer.getSize());
                     renderPass.setIndexBuffer(mesh.indexBuffer, wgpu::IndexFormat::Uint32, 0, mesh.indexBuffer.getSize());
-
                     renderPass.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
                 });
             }
@@ -126,13 +144,16 @@ class RenderGraph {
             // Finally encode and submit the render pass
             wgpu::CommandBufferDescriptor cmdBufferDescriptor(wgpu::Default);
             cmdBufferDescriptor.label = wgpu::StringView(fmt::format("CreateRenderPass::{}::CommandBuffer", renderPassData.name));
-            auto command = commandEncoder.finish(cmdBufferDescriptor);
+            commandBuffers.push_back(commandEncoder.finish(cmdBufferDescriptor));
             commandEncoder.release();
 
-            queue.submit(1, &command);
-            command.release();
+            queue.submit(static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+            for (auto &command : commandBuffers) {
+                command.release();
+            }
         }
 
-        // For now I will consider renderpass as non dependent for simplicity
-        std::list<RenderPassData> nodes;
+        std::vector<RenderPassData> singleRenderPasses;
+        std::vector<MultipleRenderPassData> multipleRenderPasses;
+        std::list<std::pair<std::string, size_t>> order;
 };

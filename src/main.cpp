@@ -215,8 +215,8 @@ auto main(int ac, char **av) -> int
 
 			auto size = window.GetSize();
 
-			cameraData.position = { -6.0f, 3.0f, 0.0f };
-			cameraData.pitch = glm::radians(-35.0f);
+			cameraData.position = { -3.0f, 1.0f, 0.0f };
+			cameraData.pitch = glm::radians(0.0f);
 			cameraData.aspectRatio = static_cast<float>(size.x) / static_cast<float>(size.y);
 		},
 		[](ES::Engine::Core &core) {
@@ -227,27 +227,27 @@ auto main(int ac, char **av) -> int
 			lights.push_back({
 				.color = { 204.0f / 255.0f, 42.0f / 255.0f, 34.0f / 255.0f, 1.0f },
 				.direction = { 0.0f, 0.2f, 0.0f },
-				.intensity = 2.5f,
+				.intensity = .5f,
 				.enabled = true
 			});
 
 			lights.push_back({
 				.color = { 136.0f / 255.0f, 255.0f / 255.0f, 36.0f / 255.0f, 1.0f },
 				.direction = { -3.0f, 0.1f, 0.0f },
-				.intensity = 1.f,
+				.intensity = .5f,
 				.enabled = true
 			});
 
 			lights.push_back({
 				.color = { 0.0f / 255.0f, 86.0f / 255.0f, 255.0f / 255.0f, 1.0f },
 				.direction = { 3.0f, 2.0f, 1.5f },
-				.intensity = 4.9f,
+				.intensity = 1.0f,
 				.enabled = true
 			});
 
 			lights.push_back({
 				.color = { 255.0f / 255.0f, 134.0f / 255.0f, 82.0f / 255.0f, 1.0f },
-				.direction = { -1.25f, 0.55f, 0.32f },
+				.direction = { 3.f, -50.f, -5.f },
 				.intensity = 0.4f,
 				.enabled = true,
 				.type = Light::Type::Directional
@@ -297,25 +297,26 @@ auto main(int ac, char **av) -> int
 				entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0), glm::vec3(0.01f));
 				entity.AddComponent<Name>(core, fmt::format("Sponza {}", i));
 			}
-		},
-		[](ES::Engine::Core &core) {
-			auto entity = ES::Engine::Entity(core.CreateEntity());
+		}
+		// TODO: loading this model remove shadow pass wtf, understand why
+		// ,[](ES::Engine::Core &core) {
+		// 	auto entity = ES::Engine::Entity(core.CreateEntity());
 
-			std::vector<glm::vec3> vertices;
-			std::vector<glm::vec3> normals;
-			std::vector<glm::vec2> texCoords;
-			std::vector<uint32_t> indices;
+		// 	std::vector<glm::vec3> vertices;
+		// 	std::vector<glm::vec3> normals;
+		// 	std::vector<glm::vec2> texCoords;
+		// 	std::vector<uint32_t> indices;
 
-			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
-			if (!success) throw std::runtime_error("Model cant be loaded");
+		// 	bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
+		// 	if (!success) throw std::runtime_error("Model cant be loaded");
 
-			auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
-			mesh.pipelineType = PipelineType::_3D;
-			mesh.enabled = false;
-			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f), glm::vec3(1.f));
-			entity.AddComponent<Name>(core, "Finish");
-		},
-		[](ES::Engine::Core &core) {
+		// 	auto &mesh = entity.AddComponent<ES::Plugin::WebGPU::Component::Mesh>(core, core, vertices, normals, texCoords, indices);
+		// 	mesh.pipelineType = PipelineType::_3D;
+		// 	mesh.enabled = false;
+		// 	entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f), glm::vec3(1.f));
+		// 	entity.AddComponent<Name>(core, "Finish");
+		// }
+		,[](ES::Engine::Core &core) {
 			auto entity = ES::Engine::Entity(core.CreateEntity());
 
 			auto &textureManager = core.GetResource<TextureManager>();
