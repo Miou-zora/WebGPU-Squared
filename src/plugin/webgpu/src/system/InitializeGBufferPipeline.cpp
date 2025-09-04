@@ -1,7 +1,7 @@
 #include "InitializeGBufferPipeline.hpp"
 #include "structs.hpp"
 #include "WebGPU.hpp"
-#include "Window.hpp"
+#include "resource/window/Window.hpp"
 #include "utils.hpp"
 #include <fmt/core.h>
 

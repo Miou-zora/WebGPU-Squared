@@ -1,8 +1,8 @@
 
 #include "ConfigureSurface.hpp"
 #include "WebGPU.hpp"
-#include "Window.hpp"
-#include "Transform.hpp"
+#include "resource/window/Window.hpp"
+#include "component/Transform.hpp"
 
 void ES::Plugin::WebGPU::System::UpdateBufferUniforms(ES::Engine::Core &core) {
 	auto &device = core.GetResource<wgpu::Device>();

@@ -1,7 +1,7 @@
 
 #include "ConfigureSurface.hpp"
 #include "WebGPU.hpp"
-#include "Window.hpp"
+#include "resource/window/Window.hpp"
 
 void ES::Plugin::WebGPU::System::GenerateDefaultTexture(ES::Engine::Core &core) {
 	auto &textureManager = core.GetResource<TextureManager>();

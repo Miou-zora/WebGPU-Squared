@@ -1,7 +1,7 @@
 #include "InitGBufferTextures.hpp"
 #include "structs.hpp"
-#include "Window.hpp"
-#include "PluginWindow.hpp"
+#include "resource/window/Window.hpp"
+#include "plugin/PluginWindow.hpp"
 #include <GLFW/glfw3.h>
 
 namespace ES::Plugin::WebGPU::System {

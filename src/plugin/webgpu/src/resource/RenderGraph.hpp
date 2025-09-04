@@ -1,7 +1,7 @@
 #pragma once
 
 #include "structs.hpp"
-#include "Entity.hpp"
+#include "entity/Entity.hpp"
 
 // TODO: Add namespace
 class RenderGraph {

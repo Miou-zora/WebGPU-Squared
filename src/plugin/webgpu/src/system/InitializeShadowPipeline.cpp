@@ -1,6 +1,6 @@
 #include "InitializeShadowPipeline.hpp"
 #include "WebGPU.hpp"
-#include "Window.hpp"
+#include "resource/window/Window.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 

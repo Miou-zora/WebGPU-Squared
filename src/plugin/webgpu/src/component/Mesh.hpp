@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include "util/webgpu.hpp"
 #include <entt/entt.hpp>
-#include "Core.hpp"
+#include "core/Core.hpp"
 #include "PipelineType.hpp"
 
 namespace ES::Plugin::WebGPU::Component {

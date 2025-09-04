@@ -1,7 +1,7 @@
 #pragma once
 
 #include "webgpu.hpp"
-#include "Core.hpp"
+#include "core/Core.hpp"
 
 namespace ES::Plugin::WebGPU::Util {
 

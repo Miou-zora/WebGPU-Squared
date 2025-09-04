@@ -1,5 +1,6 @@
-#include "PluginWindow.hpp"
+#include "plugin/PluginWindow.hpp"
 #include "RenderingPipeline.hpp"
+#include "scheduler/Shutdown.hpp"
 #include "WebGPU.hpp"
 #include <lodepng.h>
 #include <chrono>

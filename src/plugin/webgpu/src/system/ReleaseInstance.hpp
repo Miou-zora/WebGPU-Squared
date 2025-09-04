@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core.hpp"
+#include "core/Core.hpp"
 
 namespace ES::Plugin::WebGPU::System {
 void ReleaseInstance(ES::Engine::Core &core);

@@ -1,5 +1,5 @@
 add_rules("mode.debug", "mode.release")
-add_requires("spdlog", "entt", "fmt", "glm")
+-- add_requires("spdlog", "entt", "fmt", "glm")
 add_requires("wgpu-native ^24.0.0", {configs = {shared = false}})
 add_requires("glfw ^3.4", { configs = {shared = false} })
 add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = false}, debug = true})
@@ -7,7 +7,11 @@ add_requires("imgui v1.92.0-docking", {configs = {shared = false, glfw = true, w
 add_requires("stb")
 add_requires("lodepng")
 
-includes("../../EngineSquared/xmake.lua")
+add_repositories("package_repo https://github.com/EngineSquared/xrepo.git")
+
+add_requires("enginesquared webgpu")
+
+-- includes("../../EngineSquared/xmake.lua")
 includes("src/plugin/imgui/xmake.lua")
 includes("src/plugin/webgpu/xmake.lua")
 
@@ -19,13 +23,14 @@ target(project_name)
     set_kind("binary")
     set_default(true)
     add_packages("wgpu-native")
-    add_packages("spdlog", "entt", "fmt", "glm")
+    -- add_packages("spdlog", "entt", "fmt", "glm")
     add_packages("stb")
     add_packages("imgui")
     add_packages("glfw3webgpu")
     add_packages("lodepng")
 
-    add_deps("EngineSquared")
+    -- add_deps("EngineSquared")
+    add_packages("enginesquared")
     add_deps("PluginImGUI")
     add_deps("PluginWebGPU")
 
