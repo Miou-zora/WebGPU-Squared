@@ -218,7 +218,7 @@ void Plugin::Bind() {
                         textureViewDesc.baseMipLevel = 0;
                         textureViewDesc.mipLevelCount = 1;
                         textureViewDesc.baseArrayLayer = 0;
-                        textureViewDesc.arrayLayerCount = lightIndex;
+                        textureViewDesc.arrayLayerCount = std::max(1lu, lightIndex);
                         textureViewDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
 
                         textureShadows.textureView = textureShadows.texture.createView(textureViewDesc);

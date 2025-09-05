@@ -73,7 +73,9 @@ void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 		ImGui::ColorEdit4("Color", glm::value_ptr(lights[i].color));
 		ImGui::DragFloat3("Direction(Directional)/Position(Point)", glm::value_ptr(lights[i].direction), 0.1f);
 		ImGui::DragFloat("Intensity", &lights[i].intensity, 0.1f);
-		ImGui::Combo("Type", (int *)&lights[i].type, "Directional\0Point\0Spot\0");
+		if (ImGui::Combo("Type", (int *)&lights[i].type, "Directional\0Point\0Spot\0")) {
+			lightsDirty = true;
+		}
 		ImGui::PopID();
 	}
 	ImGui::EndChild();
