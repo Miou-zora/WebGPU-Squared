@@ -19,6 +19,7 @@ local project_name = "e2-wgpu"
 
 set_languages("c++20")
 
+add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 target(project_name)
     set_kind("binary")
     set_default(true)

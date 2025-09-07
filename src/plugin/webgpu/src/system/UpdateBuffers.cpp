@@ -46,6 +46,11 @@ void UpdateBuffers(ES::Engine::Core &core)
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, projectionMatrix), &uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
 	queue.writeBuffer(uniformBuffer, offsetof(MyUniforms, cameraPosition), &uniforms.cameraPosition, sizeof(MyUniforms::cameraPosition));
 
+	const glm::mat4 skyboxViewMatrix = glm::mat4(glm::mat3(uniforms.viewMatrix));
+	const glm::mat4 skyboxProjectionMatrix = uniforms.projectionMatrix;
+	const glm::mat4 skyboxVP = skyboxProjectionMatrix * skyboxViewMatrix;
+	queue.writeBuffer(skyboxBuffer, 0, &skyboxVP, sizeof(glm::mat4));
+
 	auto &lights = core.GetResource<std::vector<Light>>();
 	uint32_t lightsCount = static_cast<uint32_t>(lights.size());
 

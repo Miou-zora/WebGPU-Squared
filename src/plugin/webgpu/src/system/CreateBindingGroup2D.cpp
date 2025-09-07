@@ -7,7 +7,6 @@ void CreateBindingGroup2D(ES::Engine::Core &core)
 	auto &device = core.GetResource<wgpu::Device>();
 	auto &pipelineData = core.GetResource<Pipelines>().renderPipelines["2D"];
 	auto &bindGroups = core.GetResource<BindGroups>();
-	//TODO: Put this in a separate system
 	//TODO: Should we separate this from pipelineData?
 
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot create binding group.");

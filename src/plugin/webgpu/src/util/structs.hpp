@@ -86,6 +86,7 @@ struct BindGroups {
 struct PipelineData {
 	wgpu::RenderPipeline pipeline = nullptr;
 	std::vector<wgpu::BindGroupLayout> bindGroupLayouts;
+	// Is layout useless here ?
 	wgpu::PipelineLayout layout = nullptr;
 };
 
@@ -98,10 +99,11 @@ struct Uniforms2D {
 	glm::mat4 orthoMatrix;
 };
 
-
 // TODO: store them is resource
 inline wgpu::Buffer uniformBuffer = nullptr;
 inline wgpu::Buffer uniform2DBuffer = nullptr;
+inline wgpu::Buffer skyboxBuffer = nullptr;
+inline wgpu::Buffer skyboxCubeBuffer = nullptr;
 inline wgpu::Buffer lightsBuffer = nullptr;
 inline wgpu::TextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
 inline wgpu::Buffer cameraBuffer = nullptr;
@@ -131,7 +133,7 @@ struct RenderPassData {
 	std::optional<std::function<glm::vec4(ES::Engine::Core &)>> clearColor; // 0 to 1 range, nullptr if load operation is not clear
 	std::list<std::string> dependsOn;
 	std::vector<std::string> outputColorTextureName;
-	std::string outputDepthTextureName;
+	std::optional<std::string> outputDepthTextureName;
 	std::vector<BindGroupsLinks> bindGroups;
 	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core)>> uniqueRenderCallback = std::nullopt;
 	std::optional<std::function<void(wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core, ES::Plugin::WebGPU::Component::Mesh &, ES::Plugin::Object::Component::Transform &, ES::Engine::Entity)>> perEntityCallback;
@@ -145,4 +147,49 @@ struct MultipleRenderPassData {
 	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> prePassCallback;
 	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> postPassCallback;
 	std::optional<std::function<void(ES::Engine::Core &, RenderPassData &)>> postMultiplePassCallback;
+};
+
+inline const std::array<float, 180> skyboxCube = {
+// float3 position, float2 uv,
+  1.f, -1.f, 1.f,    0.f, 1.f,
+  -1.f, -1.f, 1.f,   1.f, 1.f,
+  -1.f, -1.f, -1.f,  1.f, 0.f,
+  1.f, -1.f, -1.f,   0.f, 0.f,
+  1.f, -1.f, 1.f,    0.f, 1.f,
+  -1.f, -1.f, -1.f,  1.f, 0.f,
+
+  1.f, 1.f, 1.f,     0.f, 1.f,
+  1.f, -1.f, 1.f,    1.f, 1.f,
+  1.f, -1.f, -1.f,   1.f, 0.f,
+  1.f, 1.f, -1.f,    0.f, 0.f,
+  1.f, 1.f, 1.f,     0.f, 1.f,
+  1.f, -1.f, -1.f,   1.f, 0.f,
+
+  -1.f, 1.f, 1.f,    0.f, 1.f,
+  1.f, 1.f, 1.f,     1.f, 1.f,
+  1.f, 1.f, -1.f,    1.f, 0.f,
+  -1.f, 1.f, -1.f,   0.f, 0.f,
+  -1.f, 1.f, 1.f,    0.f, 1.f,
+  1.f, 1.f, -1.f,    1.f, 0.f,
+
+  -1.f, -1.f, 1.f,   0.f, 1.f,
+  -1.f, 1.f, 1.f,    1.f, 1.f,
+  -1.f, 1.f, -1.f,   1.f, 0.f,
+  -1.f, -1.f, -1.f,  0.f, 0.f,
+  -1.f, -1.f, 1.f,   0.f, 1.f,
+  -1.f, 1.f, -1.f,   1.f, 0.f,
+
+  1.f, 1.f, 1.f,     0.f, 1.f,
+  -1.f, 1.f, 1.f,    1.f, 1.f,
+  -1.f, -1.f, 1.f,   1.f, 0.f,
+  -1.f, -1.f, 1.f,   1.f, 0.f,
+  1.f, -1.f, 1.f,    0.f, 0.f,
+  1.f, 1.f, 1.f,     0.f, 1.f,
+
+  1.f, -1.f, -1.f,   0.f, 1.f,
+  -1.f, -1.f, -1.f,  1.f, 1.f,
+  -1.f, 1.f, -1.f,   1.f, 0.f,
+  1.f, 1.f, -1.f,    0.f, 0.f,
+  1.f, -1.f, -1.f,   0.f, 1.f,
+  -1.f, 1.f, -1.f,   1.f, 0.f,
 };

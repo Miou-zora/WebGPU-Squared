@@ -113,7 +113,22 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	wgpu::BindGroupLayout bindGroupLayoutShadows = device.createBindGroupLayout(bindGroupLayoutDescShadows);
 
 
-	std::array<WGPUBindGroupLayout, 4> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera, bindGroupLayoutShadows};
+	WGPUBindGroupLayoutEntry bindingLayoutSkybox = {0};
+	bindingLayoutSkybox.binding = 0;
+	bindingLayoutSkybox.visibility = wgpu::ShaderStage::Fragment;
+	bindingLayoutSkybox.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+	bindingLayoutSkybox.texture.viewDimension = wgpu::TextureViewDimension::_2D;
+
+	std::array<WGPUBindGroupLayoutEntry, 1> bindingSkybox = { bindingLayoutSkybox };
+
+	wgpu::BindGroupLayoutDescriptor bindGroupLayoutDescSkybox(wgpu::Default);
+	bindGroupLayoutDescSkybox.entryCount = bindingSkybox.size();
+	bindGroupLayoutDescSkybox.entries = bindingSkybox.data();
+	bindGroupLayoutDescSkybox.label = wgpu::StringView("Skybox Bind Group Layout");
+	wgpu::BindGroupLayout bindGroupLayoutSkybox = device.createBindGroupLayout(bindGroupLayoutDescSkybox);
+
+
+	std::array<WGPUBindGroupLayout, 5> bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera, bindGroupLayoutShadows, bindGroupLayoutSkybox};
 
 	wgpu::PipelineLayoutDescriptor layoutDesc(wgpu::Default);
 	layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
@@ -140,10 +155,6 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
     pipelineDesc.fragment = &fragmentState;
 	pipelineDesc.layout = layout;
 
-	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
-
-	int frameBufferSizeX, frameBufferSizeY;
-	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
 
 	wgpu::DepthStencilState depthStencilState(wgpu::Default);
 	depthStencilState.depthCompare = wgpu::CompareFunction::Less;
@@ -160,7 +171,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 
 	core.GetResource<Pipelines>().renderPipelines["Deferred"] = PipelineData{
 		.pipeline = pipeline,
-		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera, bindGroupLayoutShadows},
+		.bindGroupLayouts = {bindGroupLayout, bindGroupLayoutLights, bindGroupLayoutCamera, bindGroupLayoutShadows, bindGroupLayoutSkybox},
 		.layout = layout,
 	};
 }

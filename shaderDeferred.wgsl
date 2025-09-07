@@ -43,6 +43,8 @@ struct Camera {
 @group(3) @binding(0) var lightsDirectionalTextures: texture_depth_2d_array;
 @group(3) @binding(1) var lightsDirectionalTextureSampler: sampler_comparison;
 
+@group(4) @binding(0) var skybox: texture_2d<f32>;
+
 const shadowDepthTextureSize: f32 = 2048.0;
 
 fn world_from_screen_coord(coord : vec2f, depth_sample: f32) -> vec3f {
@@ -101,9 +103,14 @@ fn fs_main(
     0
   ).x;
 
-  // Don't light the sky.
+  let skyboxColor = textureLoad(
+    skybox,
+    vec2i(floor(coord.xy)),
+    0
+  ).rgb;
+
   if (depth >= 1.0) {
-    discard;
+    return vec4(skyboxColor, 1.0);
   }
 
   let bufferSize = textureDimensions(gBufferDepth);

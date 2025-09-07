@@ -81,15 +81,17 @@ class RenderGraph {
             renderPassDesc.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
             renderPassDesc.colorAttachments = colorAttachments.data();
 
-            wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
-            {
-                depthStencilAttachment.view = core.GetResource<TextureManager>().Get(entt::hashed_string(renderPassData.outputDepthTextureName.c_str())).textureView;
-                depthStencilAttachment.depthClearValue = 1.0f;
-                depthStencilAttachment.depthLoadOp = renderPassData.loadOp;
-                depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
-            }
+            if (renderPassData.outputDepthTextureName.has_value()) {
+                wgpu::RenderPassDepthStencilAttachment depthStencilAttachment(wgpu::Default);
+                {
+                    depthStencilAttachment.view = core.GetResource<TextureManager>().Get(entt::hashed_string(renderPassData.outputDepthTextureName.value().c_str())).textureView;
+                    depthStencilAttachment.depthClearValue = 1.0f;
+                    depthStencilAttachment.depthLoadOp = renderPassData.loadOp;
+                    depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+                }
 
-            renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+                renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+            }
 
             wgpu::RenderPassEncoder renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 

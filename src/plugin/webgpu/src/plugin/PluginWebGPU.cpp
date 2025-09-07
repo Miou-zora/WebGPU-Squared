@@ -122,6 +122,7 @@ void Plugin::Bind() {
         System::Initialize2DPipeline,
         System::InitializeDeferredPipeline,
         System::InitializeShadowPipeline,
+        System::InitializeSkyboxPipeline,
         System::InitializeBuffers,
         System::Create2DPipelineBuffer,
         System::CreateBindingGroup,
@@ -133,6 +134,8 @@ void Plugin::Bind() {
         System::InitializeGBufferPipeline,
         System::InitGBufferBuffers,
         System::InitShadowTexture,
+        System::InitSkyboxBuffers,
+        System::CreateBindingGroupSkybox,
         System::CreateBindingGroupGBuffer,
         System::CreateBindingGroupDeferred,
         [](ES::Engine::Core &core) {
@@ -297,6 +300,25 @@ void Plugin::Bind() {
             );
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
+                    .name = "Skybox",
+                    .shaderName = "Skybox",
+                    .pipelineType = PipelineType::_3D,
+                    .loadOp = wgpu::LoadOp::Clear,
+                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
+                        return glm::vec4(0, 0, 0, 0);
+                    },
+                    .outputColorTextureName = {"SkyboxOutput"},
+                    .bindGroups = {
+                        { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "Skybox" },
+                    },
+                    .uniqueRenderCallback = [](wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
+                        renderPass.setVertexBuffer(0, skyboxCubeBuffer, 0, skyboxCubeBuffer.getSize());
+                        renderPass.draw(36, 1, 0, 0);
+                    }
+                }
+            );
+            core.GetResource<RenderGraph>().AddRenderPass(
+                RenderPassData{
                     .name = "Deferred",
                     .shaderName = "Deferred",
                     .pipelineType = PipelineType::_3D,
@@ -311,7 +333,8 @@ void Plugin::Bind() {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup0" },
                         { .groupIndex = 1, .type = BindGroupsLinks::AssetType::BindGroup, .name = "2" },
                         { .groupIndex = 2, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup2" },
-                        { .groupIndex = 3, .type = BindGroupsLinks::AssetType::TextureView, .name = "shadows" }
+                        { .groupIndex = 3, .type = BindGroupsLinks::AssetType::TextureView, .name = "shadows" },
+                        { .groupIndex = 4, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup4" }
                     },
                     .uniqueRenderCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core) {
                         renderPass.draw(6, 1, 0, 0);

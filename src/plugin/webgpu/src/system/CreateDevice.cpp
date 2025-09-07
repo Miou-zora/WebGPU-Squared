@@ -12,9 +12,13 @@ void CreateDevice(ES::Engine::Core &core) {
 
 	wgpu::DeviceDescriptor deviceDesc(wgpu::Default);
 
+	wgpu::Limits requiredLimits(wgpu::Default);
+
+	requiredLimits.maxBindGroups = 8;
+
 	deviceDesc.label = wgpu::StringView("My Device");
 	deviceDesc.requiredFeatureCount = 0;
-	deviceDesc.requiredLimits = nullptr;
+	deviceDesc.requiredLimits = &requiredLimits;
 	deviceDesc.defaultQueue.nextInChain = nullptr;
 	deviceDesc.defaultQueue.label = wgpu::StringView("The default queue");
 	deviceDesc.deviceLostCallbackInfo = {};

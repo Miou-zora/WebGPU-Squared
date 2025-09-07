@@ -117,10 +117,21 @@ void InitializeGBufferPipeline(ES::Engine::Core &core) {
     fragmentState.module = shaderModule;
     fragmentState.entryPoint = wgpu::StringView("fs_main");
 
+    wgpu::BlendState blendState(wgpu::Default);
     std::vector<wgpu::ColorTargetState> colorTargets;
-    wgpu::ColorTargetState normalColorTarget(wgpu::Default); normalColorTarget.format = wgpu::TextureFormat::RGBA16Float; normalColorTarget.writeMask = wgpu::ColorWriteMask::All; wgpu::BlendState blendState(wgpu::Default); normalColorTarget.blend = &blendState;
-    wgpu::ColorTargetState albedoColorTarget(wgpu::Default); albedoColorTarget.format = wgpu::TextureFormat::BGRA8Unorm; albedoColorTarget.writeMask = wgpu::ColorWriteMask::All; albedoColorTarget.blend = &blendState;
-    colorTargets.push_back(normalColorTarget); colorTargets.push_back(albedoColorTarget);
+
+    wgpu::ColorTargetState normalColorTarget(wgpu::Default);
+    normalColorTarget.format = wgpu::TextureFormat::RGBA16Float;
+    normalColorTarget.writeMask = wgpu::ColorWriteMask::All;
+    normalColorTarget.blend = &blendState;
+
+    wgpu::ColorTargetState albedoColorTarget(wgpu::Default);
+    albedoColorTarget.format = wgpu::TextureFormat::BGRA8Unorm;
+    albedoColorTarget.writeMask = wgpu::ColorWriteMask::All;
+    albedoColorTarget.blend = &blendState;
+
+    colorTargets.push_back(normalColorTarget);
+    colorTargets.push_back(albedoColorTarget);
     fragmentState.targetCount = static_cast<uint32_t>(colorTargets.size());
     fragmentState.targets = colorTargets.data();
     pipelineDesc.fragment = &fragmentState;

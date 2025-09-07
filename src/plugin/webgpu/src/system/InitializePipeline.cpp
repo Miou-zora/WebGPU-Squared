@@ -106,9 +106,6 @@ void InitializePipeline(ES::Engine::Core &core)
 
 	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 
-	int frameBufferSizeX, frameBufferSizeY;
-	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
-
 	wgpu::DepthStencilState depthStencilState(wgpu::Default);
 	depthStencilState.depthCompare = wgpu::CompareFunction::Less;
 	depthStencilState.depthWriteEnabled = wgpu::OptionalBool::True;

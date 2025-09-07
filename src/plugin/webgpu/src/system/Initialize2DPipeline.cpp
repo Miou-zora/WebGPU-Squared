@@ -111,9 +111,6 @@ void Initialize2DPipeline(ES::Engine::Core &core)
     pipelineDesc.fragment = &fragmentState;
 	pipelineDesc.layout = layout;
 
-	int frameBufferSizeX, frameBufferSizeY;
-	glfwGetFramebufferSize(window.GetGLFWWindow(), &frameBufferSizeX, &frameBufferSizeY);
-
 	wgpu::DepthStencilState depthStencilState(wgpu::Default);
 	depthStencilState.depthCompare = wgpu::CompareFunction::Less;
 	depthStencilState.depthWriteEnabled = wgpu::OptionalBool::True;
