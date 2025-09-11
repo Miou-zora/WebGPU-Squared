@@ -28,7 +28,6 @@ void DumpDepthTextureAsPNG(
     bufDesc.label = wgpu::StringView("Depth Readback Buffer");
     wgpu::Buffer readbackBuffer = device.createBuffer(bufDesc);
 
-    // 2. Copy texture → buffer (API v24: TexelCopyTextureInfo / TexelCopyBufferInfo)
     wgpu::CommandEncoder encoder = device.createCommandEncoder();
 
     wgpu::TexelCopyTextureInfo srcView(wgpu::Default);
@@ -123,6 +122,7 @@ void Plugin::Bind() {
         System::InitializeDeferredPipeline,
         System::InitializeShadowPipeline,
         System::InitializeSkyboxPipeline,
+        System::InitializeEndPostProcessPipeline,
         System::InitializeBuffers,
         System::Create2DPipelineBuffer,
         System::CreateBindingGroup,
@@ -134,6 +134,7 @@ void Plugin::Bind() {
         System::InitializeGBufferPipeline,
         System::InitGBufferBuffers,
         System::InitShadowTexture,
+        System::InitEndPostProcess,
         System::InitSkyboxBuffers,
         System::CreateBindingGroupSkybox,
         System::CreateBindingGroupGBuffer,
@@ -323,11 +324,8 @@ void Plugin::Bind() {
                     .shaderName = "Deferred",
                     .pipelineType = PipelineType::_3D,
                     .loadOp = wgpu::LoadOp::Clear,
-                    .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-                        auto &clearColor = core.GetResource<ClearColor>().value;
-                        return glm::vec4(0.1, 0.2, 0.3, 1.0);
-                    },
-                    .outputColorTextureName = {"WindowColorTexture"},
+                    .clearColor = [](ES::Engine::Core &core) -> auto { return glm::vec4(0.f, 0.f, 0.f, 1.0); },
+                    .outputColorTextureName = {"InputEndPostProcess"},
                     .outputDepthTextureName = "WindowDepthTexture",
                     .bindGroups = {
                         { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "DeferredGroup0" },
@@ -341,6 +339,24 @@ void Plugin::Bind() {
                     }
                 }
             );
+
+            core.GetResource<RenderGraph>().AddRenderPass(
+                RenderPassData{
+                    .name = "EndPostProcess",
+                    .shaderName = "EndPostProcess",
+                    .pipelineType = PipelineType::_3D,
+                    .loadOp = wgpu::LoadOp::Clear,
+                    .clearColor = [](ES::Engine::Core &core) -> auto { return glm::vec4(0.f, 0.f, 0.f, 1.f); },
+                    .outputColorTextureName = {"WindowColorTexture"},
+                    .bindGroups = {
+                        { .groupIndex = 0, .type = BindGroupsLinks::AssetType::BindGroup, .name = "InputEndPostProcess" }
+                    },
+                    .uniqueRenderCallback = [](wgpu::RenderPassEncoder &renderPass, ES::Engine::Core &core) {
+                        renderPass.draw(6, 1, 0, 0);
+                    }
+                }
+            );
+
             core.GetResource<RenderGraph>().AddRenderPass(
                 RenderPassData{
                     .name = "2D",

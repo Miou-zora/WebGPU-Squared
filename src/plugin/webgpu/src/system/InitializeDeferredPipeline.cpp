@@ -7,7 +7,6 @@ namespace ES::Plugin::WebGPU::System {
 void InitializeDeferredPipeline(ES::Engine::Core &core)
 {
 	wgpu::Device device = core.GetResource<wgpu::Device>();
-	wgpu::TextureFormat surfaceFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
 
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize pipeline.");
 
@@ -145,7 +144,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	fragmentState.entryPoint = wgpu::StringView("fs_main");
 
 	wgpu::ColorTargetState colorTarget(wgpu::Default);
-    colorTarget.format = surfaceFormat;
+    colorTarget.format = wgpu::TextureFormat::RGBA16Float;
 	colorTarget.writeMask = wgpu::ColorWriteMask::All;
 
 	wgpu::BlendState blendState(wgpu::Default);
