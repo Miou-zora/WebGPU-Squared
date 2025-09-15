@@ -14,6 +14,7 @@ add_requires("enginesquared webgpu")
 -- includes("../../EngineSquared/xmake.lua")
 includes("src/plugin/imgui/xmake.lua")
 includes("src/plugin/webgpu/xmake.lua")
+includes("src/plugin/rmlui-webgpu/xmake.lua")
 
 local project_name = "e2-wgpu"
 
@@ -34,6 +35,7 @@ target(project_name)
     add_packages("enginesquared")
     add_deps("PluginImGUI")
     add_deps("PluginWebGPU")
+    add_deps("PluginRmluiWebgpu")
 
 
     if is_mode("debug") then

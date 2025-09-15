@@ -1,10 +1,12 @@
-#include "ImGUI.hpp"
+// TODO: find a better way to not create dependencies to ImGui when not used
+// #define USE_IMGUI
+#if defined(USE_IMGUI)
+	#include "ImGUI.hpp"
+#endif
 #include "WebGPU.hpp"
+#include "RmluiWebgpu.hpp"
 #include "RenderingPipeline.hpp"
 #include "Input.hpp"
-
-// TODO: check learn webgpu c++ why I had this variable
-uint32_t uniformStride = 0;
 
 float cameraScale = 1.0f;
 float cameraSpeed = 3.0f;
@@ -131,14 +133,15 @@ class CameraPlugin : public ES::Engine::APlugin {
 						cameraData.fovY += sensitivity * static_cast<float>(-y);
 						cameraData.fovY = glm::clamp(cameraData.fovY, glm::radians(0.1f), glm::radians(179.9f));
 					});
-
 					inputManager.RegisterKeyCallback([](ES::Engine::Core &cbCore, int key, int scancode, int action, int mods) {
+#if defined(USE_IMGUI)
 						// TODO: find a way to properly lock callbacks to ImGui
 						ImGuiIO& io = ImGui::GetIO();
 						if (io.WantCaptureKeyboard) {
 							ImGui_ImplGlfw_KeyCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), key, scancode, action, mods);
 							return;
 						}
+#endif
 
 						if (key == GLFW_KEY_M && action == GLFW_PRESS) {
 							cameraScale *= 10.f;
@@ -150,11 +153,13 @@ class CameraPlugin : public ES::Engine::APlugin {
 					});
 
 					inputManager.RegisterMouseButtonCallback([&](ES::Engine::Core &cbCore, int button, int action, int) {
+#if defined(USE_IMGUI)
 						// TODO: find a way to properly lock callbacks to ImGui
 						ImGuiIO& io = ImGui::GetIO();
 						if (io.WantCaptureMouse) {
 							ImGui_ImplGlfw_MouseButtonCallback(cbCore.GetResource<ES::Plugin::Window::Resource::Window>().GetGLFWWindow(), button, action, 0);
 						}
+#endif
 						auto &cameraData = cbCore.GetResource<CameraData>();
 						auto &drag = cbCore.GetResource<DragState>();
 						auto &window = cbCore.GetResource<ES::Plugin::Window::Resource::Window>();
@@ -162,7 +167,9 @@ class CameraPlugin : public ES::Engine::APlugin {
 						if (button == GLFW_MOUSE_BUTTON_LEFT) {
 							switch(action) {
 							case GLFW_PRESS:
+#if defined(USE_IMGUI)
 								if (io.WantCaptureMouse) return;
+#endif
 								drag.active = true;
 								drag.startMouse = glm::vec2(mousePos.x, -window.GetSize().y+mousePos.y);
 								drag.originYaw = cameraData.yaw;
@@ -204,7 +211,8 @@ auto main(int ac, char **av) -> int
 
 	core.AddPlugins<
 		ES::Plugin::WebGPU::Plugin,
-		ES::Plugin::ImGUI::WebGPU::Plugin,
+		// ES::Plugin::ImGUI::WebGPU::Plugin,
+		ES::Plugin::Rmlui::WebGPU::Plugin,
 		CameraPlugin
 	>();
 
