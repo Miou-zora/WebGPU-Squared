@@ -16,3 +16,5 @@ target("PluginRmluiWebgpu")
 
     add_headerfiles("src/(**.hpp)")
     add_headerfiles("src/(plugin/**.hpp)")
+    add_headerfiles("src/(system/**.hpp)")
+    add_headerfiles("src/(resource/**.hpp)")

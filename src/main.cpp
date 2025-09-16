@@ -212,7 +212,7 @@ auto main(int ac, char **av) -> int
 	core.AddPlugins<
 		ES::Plugin::WebGPU::Plugin,
 		// ES::Plugin::ImGUI::WebGPU::Plugin,
-		ES::Plugin::Rmlui::WebGPU::Plugin,
+		ES::Plugin::Rmlui::Plugin,
 		CameraPlugin
 	>();
 

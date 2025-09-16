@@ -1,8 +1,10 @@
-#include "PluginRmluiWebgpu.hpp"
+#include "RmluiWebgpu.hpp"
+#include "RenderingPipeline.hpp"
 
 namespace ES::Plugin::Rmlui {
-    namespace WebGPU {
-        void Plugin::Bind() {
-		}
+    void Plugin::Bind() {
+        RequirePlugins<ES::Plugin::RenderingPipeline::Plugin>();
+
+        RegisterResource(Resource::UIContext());
     }
 }
