@@ -1,17 +1,42 @@
 #pragma once
 
 #include "Engine.hpp"
+#include "utils/IRenderer.hpp"
+
+template <typename T>
+concept CSystemInterface = std::is_base_of_v<Rml::SystemInterface, T>;
+
+template <typename T>
+concept CRenderInterface = std::is_base_of_v<Rml::RenderInterface, T> &&
+                           requires(ES::Engine::Core &a) {
+                               T(a);
+                           };
 
 namespace ES::Plugin::Rmlui
 {
+    namespace
+    {
+        enum class TransformType
+        {
+            Rotate,
+            TranslateX,
+            TranslateY,
+        };
+
+        struct TransformParam
+        {
+            TransformType type;
+            float value;
+        };
+    }
     class AUIContext
     {
     public:
-        template <typename TSystemInterface, typename TRenderInterface>
+        template <CSystemInterface TSystemInterface, CRenderInterface TRenderInterface>
         void Init(ES::Engine::Core &core)
         {
-            _system_interface = std::make_unique<TSystemInterface>();
-            _render_interface = std::make_unique<TRenderInterface>();
+            _systemInterface = std::make_unique<TSystemInterface>();
+            _renderInterface = std::make_unique<TRenderInterface>(core);
             this->__setup(core);
         }
         virtual ~AUIContext() = default;
@@ -26,10 +51,16 @@ namespace ES::Plugin::Rmlui
         virtual void Render(ES::Engine::Core &core) = 0;
         virtual void Destroy(ES::Engine::Core &core) = 0;
         virtual void UpdateMouseMoveEvent(ES::Engine::Core &core) = 0;
+        virtual void BindEventCallback(ES::Engine::Core &core) = 0;
+        virtual void SetFont(const std::string &fontPath) = 0;
+        virtual void InitDocument(const std::string &docPath) = 0;
+        virtual const std::string &GetTitle() const = 0;
+        virtual void UpdateInnerContent(const std::string &childId, const std::string &content) = 0;
+        virtual void SetTransformProperty(const std::string &childId, const std::vector<TransformParam> &transforms) = 0;
 
     protected:
-        std::unique_ptr<Rml::SystemInterface> _system_interface;
-        std::unique_ptr<Rml::RenderInterface> _render_interface;
+        std::unique_ptr<Rml::SystemInterface> _systemInterface;
+        std::unique_ptr<IRenderer> _renderInterface;
 
         virtual void __setup(ES::Engine::Core &core) = 0;
     };

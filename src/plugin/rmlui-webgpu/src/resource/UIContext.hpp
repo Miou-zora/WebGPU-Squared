@@ -40,6 +40,12 @@ namespace ES::Plugin::Rmlui::Resource
         void Render(ES::Engine::Core &core) override;
         void Destroy(ES::Engine::Core &core) override;
         void UpdateMouseMoveEvent(ES::Engine::Core &core) override;
+        void BindEventCallback(ES::Engine::Core &core) override;
+        void SetFont(const std::string &fontPath) override;
+        void InitDocument(const std::string &docPath) override;
+        const std::string &GetTitle() const override;
+        void UpdateInnerContent(const std::string &childId, const std::string &content) override;
+        void SetTransformProperty(const std::string &childId, const std::vector<TransformParam> &transforms) override;
 
     protected:
         void __setup(ES::Engine::Core &core) override;
@@ -47,8 +53,9 @@ namespace ES::Plugin::Rmlui::Resource
     private:
         std::unique_ptr<Rml::Context> _context;
         std::unique_ptr<Rml::ElementDocument> _document;
-        std::unique_ptr<Rml::SystemInterface> _systemInterface;
-        std::unique_ptr<Rml::RenderInterface> _renderInterface;
         std::unordered_map<std::string, std::unique_ptr<ES::Plugin::UI::Utils::EventListener>, TransparentHash, TransparentEqual> _events;
+
+    private:
+        bool _isReady() const;
     };
 }
