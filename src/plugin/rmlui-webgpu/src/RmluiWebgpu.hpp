@@ -4,5 +4,7 @@
 
 #include "resource/UIContext.hpp"
 
+#include "system/InitUI.hpp"
+
 #include "utils/WGPURenderInterface.hpp"
 #include "utils/IRenderer.hpp"

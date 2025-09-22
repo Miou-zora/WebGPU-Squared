@@ -46,13 +46,19 @@ namespace ES::Plugin::Rmlui::Resource
         const std::string &GetTitle() const override;
         void UpdateInnerContent(const std::string &childId, const std::string &content) override;
         void SetTransformProperty(const std::string &childId, const std::vector<TransformParam> &transforms) override;
+        void AttachEventHandlers(const std::string &elementId, const std::string &eventType, ES::Plugin::UI::Utils::EventListener::EventCallback callback) override;
+        void DetachEventHandler(const std::string &elementId, const std::string &eventType) override;
+        std::string GetValue(const std::string &elementId) const override;
+        std::string GetStyle(const std::string &elementId, const std::string &property) const override;
+        bool SetStyleProperty(const std::string &elementId, const std::string &property, const std::string &value) const override;
 
     protected:
         void __setup(ES::Engine::Core &core) override;
 
     private:
-        std::unique_ptr<Rml::Context> _context;
-        std::unique_ptr<Rml::ElementDocument> _document;
+        // TODO: find a way to check if raw ptr are correctly deleted
+        Rml::Context *_context = nullptr;
+        Rml::ElementDocument *_document = nullptr;
         std::unordered_map<std::string, std::unique_ptr<ES::Plugin::UI::Utils::EventListener>, TransparentHash, TransparentEqual> _events;
 
     private:

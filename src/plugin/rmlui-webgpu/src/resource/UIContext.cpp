@@ -10,8 +10,8 @@ namespace ES::Plugin::Rmlui::Resource
         Rml::Initialise();
 
         const auto &windowSize = core.GetResource<ES::Plugin::Window::Resource::Window>().GetSize();
-        auto context = Rml::CreateContext("main", Rml::Vector2i(windowSize.x, windowSize.y));
-        if (!context)
+        _context = Rml::CreateContext("main", Rml::Vector2i(windowSize.x, windowSize.y));
+        if (!_context)
         {
             Destroy(core);
             throw std::runtime_error("Failed to create Rml::Context");
@@ -99,8 +99,11 @@ namespace ES::Plugin::Rmlui::Resource
         if (!_context)
             return;
 
+        if (_document)
+            throw std::runtime_error("Rmlui document has already been initialized");
+
         _context->UnloadAllDocuments();
-        _document.reset(_context->LoadDocument(docPath));
+        _document = _context->LoadDocument(docPath);
         if (!_document)
             throw std::runtime_error("Rmlui did not succeed reading document");
 
@@ -176,5 +179,96 @@ namespace ES::Plugin::Rmlui::Resource
             element->SetProperty(Rml::PropertyId::Transform, property);
         else
             ES::Utils::Log::Warn(fmt::format("RmlUi: Could not apply property to node id '{}': Not found", childId));
+    }
+
+    void UIContext::AttachEventHandlers(const std::string &elementId, const std::string &eventType, ES::Plugin::UI::Utils::EventListener::EventCallback callback)
+    {
+        if (!_isReady())
+        {
+            ES::Utils::Log::Error(
+                fmt::format("RmlUi: Could not attach event {} on {}: No active document", eventType, elementId));
+            return;
+        }
+
+        Rml::Element *element = _document->GetElementById(elementId.c_str());
+
+        if (!element)
+        {
+            ES::Utils::Log::Error(
+                fmt::format("RmlUi: Could not attach events to sub elements of {}: Not found.", elementId.c_str()));
+            return;
+        }
+
+        const std::string key = elementId + "::" + eventType;
+        auto &listener = _events[key];
+        if (!listener)
+            listener = std::make_unique<ES::Plugin::UI::Utils::EventListener>(*_context);
+        listener->SetEventCallback(callback);
+        listener->AttachEvents(eventType, *element);
+    }
+
+    void UIContext::DetachEventHandler(const std::string &elementId, const std::string &eventType)
+    {
+        const std::string key = elementId + "::" + eventType;
+        _events.erase(key);
+    }
+
+    std::string UIContext::GetValue(const std::string &elementId) const
+    {
+        if (!_isReady())
+        {
+            ES::Utils::Log::Error(
+                fmt::format("RmlUi: Could not get the value of element {}: No active document", elementId));
+            return "";
+        }
+
+        Rml::Element *element = _document->GetElementById(elementId.c_str());
+
+        if (element)
+            return element->GetInnerRML();
+        ES::Utils::Log::Error(fmt::format("RmlUi: Could not get the value of element {}: Not found", elementId));
+        return "";
+    }
+
+    std::string UIContext::GetStyle(const std::string &elementId, const std::string &property) const
+    {
+        if (!_isReady())
+        {
+            ES::Utils::Log::Error(fmt::format("RmlUi: Could not get the style on {}: No active document", elementId));
+            return "";
+        }
+
+        Rml::Element *element = _document->GetElementById(elementId.c_str());
+
+        if (element)
+        {
+            const Rml::Property *prop = element->GetProperty(property);
+            if (prop)
+            {
+                return prop->ToString();
+            }
+        }
+        ES::Utils::Log::Error(fmt::format("RmlUi: Could not get the style of element {}: Not found", elementId));
+        return "";
+    }
+
+    bool UIContext::SetStyleProperty(const std::string &elementId, const std::string &property, const std::string &value) const
+    {
+        if (!_isReady())
+        {
+            ES::Utils::Log::Error(
+                fmt::format("RmlUi: Could not set the style '{}' on {}: No active document", property, elementId));
+            return false;
+        }
+
+        Rml::Element *element = _document->GetElementById(elementId.c_str());
+        if (!element)
+        {
+            ES::Utils::Log::Error(
+                fmt::format("RmlUi: Could not set the style '{}' on {}: Element not found", property, elementId));
+            return false;
+        }
+        element->SetProperty(property, value);
+        return true;
     }
 }
