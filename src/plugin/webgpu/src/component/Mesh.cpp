@@ -33,15 +33,15 @@ Mesh::Mesh(ES::Engine::Core &core, const std::vector<glm::vec3> &vertices, const
 
 	queue.writeBuffer(pointBuffer, 0, pointData.data(), bufferDesc.size);
 
-	bufferDesc.size = indexData.size() * sizeof(uint32_t);
+	bufferDesc.size = indexCount * sizeof(uint32_t);
 	bufferDesc.size = (bufferDesc.size + 3) & ~3;
-	indexData.resize((indexData.size() + 1) & ~1);
+	indexData.resize((indexCount + 1) & ~1);
 	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index;
 	indexBuffer = device.createBuffer(bufferDesc);
 
 	queue.writeBuffer(indexBuffer, 0, indexData.data(), bufferDesc.size);
 
-	bufferDesc.size = sizeof(uint32_t);
+	bufferDesc.size = indexCount * sizeof(uint32_t);
 	bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
 	transformIndexBuffer = device.createBuffer(bufferDesc);
 }

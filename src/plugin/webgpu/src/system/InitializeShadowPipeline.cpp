@@ -49,11 +49,8 @@ void InitializeShadowPipeline(ES::Engine::Core &core)
 	wgpu::VertexBufferLayout vertexBufferLayoutTransformsIndex(wgpu::Default);
     vertexBufferLayoutTransformsIndex.attributeCount = static_cast<uint32_t>(vertexAttribsTransformsIndex.size());
     vertexBufferLayoutTransformsIndex.attributes = vertexAttribsTransformsIndex.data();
-    vertexBufferLayoutTransformsIndex.arrayStride = (8 * sizeof(float));
+    vertexBufferLayoutTransformsIndex.arrayStride = (1 * sizeof(uint32_t));
     vertexBufferLayoutTransformsIndex.stepMode = wgpu::VertexStepMode::Vertex;
-
-
-
 
     WGPUBindGroupLayoutEntry transformsBindingLayout = {0};
     transformsBindingLayout.binding = 0;
@@ -68,9 +65,6 @@ void InitializeShadowPipeline(ES::Engine::Core &core)
     transformBindGroupLayoutDesc.entries = transformsBindings.data();
     transformBindGroupLayoutDesc.label = wgpu::StringView("Uniforms Bind Group Layout");
     wgpu::BindGroupLayout transformsBindGroupLayout = device.createBindGroupLayout(transformBindGroupLayoutDesc);
-
-
-
 
 	WGPUBindGroupLayoutEntry shadowDataBindingLayoutUniforms = {0};
     shadowDataBindingLayoutUniforms.binding = 0;
