@@ -13,7 +13,7 @@ void InitializeSkyboxPipeline(ES::Engine::Core &core)
 	auto &window = core.GetResource<ES::Plugin::Window::Resource::Window>();
 	wgpu::TextureFormat surfaceFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
 	const std::string pipelineName = "Skybox";
-	const std::string shaderfilePath = "shaderSkybox.wgsl";
+	const std::string shaderfilePath = "./assets/shader/shaderSkybox.wgsl";
 
 	if (device == nullptr) throw std::runtime_error(fmt::format("WebGPU device is not created, cannot initialize {} pipeline.", pipelineName));
 	if (surface == nullptr) throw std::runtime_error(fmt::format("WebGPU surface is not created, cannot initialize {} pipeline.", pipelineName));

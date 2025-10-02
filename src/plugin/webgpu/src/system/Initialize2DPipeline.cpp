@@ -22,7 +22,7 @@ void Initialize2DPipeline(ES::Engine::Core &core)
 	pipelineDesc.label = wgpu::StringView("2D Render Pipeline");
 
 	wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
-	std::string wgslSource = loadFile("shader2D.wgsl");
+	std::string wgslSource = loadFile("./assets/shader/shader2D.wgsl");
 	wgslDesc.code = wgpu::StringView(wgslSource);
 	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
     shaderDesc.nextInChain = &wgslDesc.chain; // connect the chained extension

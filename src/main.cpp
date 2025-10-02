@@ -284,7 +284,7 @@ auto main(int ac, char **av) -> int
 		{
 			std::vector<Shape> shapes;
 
-			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/sponza.obj", shapes);
+			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/model/sponza.obj", shapes);
 			if (!success)
 				throw std::runtime_error("Model cant be loaded");
 
@@ -323,7 +323,7 @@ auto main(int ac, char **av) -> int
 			std::vector<glm::vec2> texCoords;
 			std::vector<uint32_t> indices;
 
-			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/finish.obj", vertices, normals, texCoords, indices);
+			bool success = ES::Plugin::Object::Resource::OBJLoader::loadModel("assets/model/finish.obj", vertices, normals, texCoords, indices);
 			if (!success)
 				throw std::runtime_error("Model cant be loaded");
 
@@ -341,7 +341,7 @@ auto main(int ac, char **av) -> int
 
 			auto &textureManager = core.GetResource<TextureManager>();
 			auto &pipelines = core.GetResource<Pipelines>();
-			textureManager.Add(entt::hashed_string("sprite_example"), core.GetResource<wgpu::Device>(), "./assets/insect.png", pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
+			textureManager.Add(entt::hashed_string("sprite_example"), core.GetResource<wgpu::Device>(), "./assets/texture/insect.png", pipelines.renderPipelines["2D"].bindGroupLayouts[1]);
 
 			std::vector<glm::vec3> vertices;
 			std::vector<glm::vec3> normals;

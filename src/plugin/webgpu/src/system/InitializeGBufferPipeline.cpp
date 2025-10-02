@@ -19,7 +19,7 @@ void InitializeGBufferPipeline(ES::Engine::Core &core) {
     pipelineDesc.label = wgpu::StringView(fmt::format("{} Pipeline", pipelineName));
 
     wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
-    std::string wgslSource = loadFile("shaderGBuffer.wgsl");
+    std::string wgslSource = loadFile("./assets/shader/shaderGBuffer.wgsl");
     wgslDesc.code = wgpu::StringView(wgslSource);
     wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
     shaderDesc.nextInChain = &wgslDesc.chain;
