@@ -63,8 +63,8 @@ fn calculateDirectionalLight(light: Light, N: vec3f, V: vec3f, MatKd: vec3f, Mat
 
   var visibility = 0.0;
   let oneOverShadowDepthTextureSize = 1.0 / 2048.0;
-  for (var y = -3; y <= 3; y++) {
-    for (var x = -3; x <= 3; x++) {
+  for (var y = -1; y <= 1; y++) {
+    for (var x = -1; x <= 1; x++) {
       let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
 
       visibility += textureSampleCompare(
@@ -73,7 +73,7 @@ fn calculateDirectionalLight(light: Light, N: vec3f, V: vec3f, MatKd: vec3f, Mat
       );
     }
   }
-  visibility /= 27.0;
+  visibility /= 9.0;
   if (visibility < 0.01) {
     return vec3f(0.0);
   }

@@ -12,7 +12,7 @@ void ES::Plugin::WebGPU::System::UpdateBufferUniforms(ES::Engine::Core &core) {
 	size_t entityCount = 0;
 
 	core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto entity, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-		if (mesh.pipelineType != PipelineType::_3D)
+		if (mesh.pipelineType != PipelineType::_3D || !mesh.enabled)
 			return;
 		entityCount++;
 	});
@@ -21,13 +21,13 @@ void ES::Plugin::WebGPU::System::UpdateBufferUniforms(ES::Engine::Core &core) {
 
 	if (uniformsBuffer.getSize() == sizeof(Uniforms) * entityCount) {
 		core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto entity, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-			if (mesh.pipelineType != PipelineType::_3D)
+			if (mesh.pipelineType != PipelineType::_3D || !mesh.enabled)
 				return;
 			Uniforms uniforms;
 			uniforms.modelMatrix = transform.getTransformationMatrix();
 			uniforms.normalModelMatrix = glm::transpose(glm::inverse(uniforms.modelMatrix));
-			queue.writeBuffer(uniformsBuffer, offset, &uniforms, sizeof(uniforms));
-			offset += sizeof(uniforms);
+			queue.writeBuffer(uniformsBuffer, offset, &uniforms, sizeof(Uniforms));
+			offset += sizeof(Uniforms);
 		});
 		return;
 	}
@@ -39,13 +39,13 @@ void ES::Plugin::WebGPU::System::UpdateBufferUniforms(ES::Engine::Core &core) {
     uniformsBuffer = device.createBuffer(bufferDesc);
 
 	core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, ES::Plugin::Object::Component::Transform>().each([&](auto entity, ES::Plugin::WebGPU::Component::Mesh &mesh, ES::Plugin::Object::Component::Transform &transform) {
-		if (mesh.pipelineType != PipelineType::_3D)
+		if (mesh.pipelineType != PipelineType::_3D || !mesh.enabled)
 			return;
 		Uniforms uniforms;
 		uniforms.modelMatrix = transform.getTransformationMatrix();
 		uniforms.normalModelMatrix = glm::transpose(glm::inverse(uniforms.modelMatrix));
-		queue.writeBuffer(uniformsBuffer, offset, &uniforms, sizeof(uniforms));
-		offset += sizeof(uniforms);
+		queue.writeBuffer(uniformsBuffer, offset, &uniforms, sizeof(Uniforms));
+		offset += sizeof(Uniforms);
 	});
 
 	wgpu::BindGroupEntry bindingUniforms(wgpu::Default);

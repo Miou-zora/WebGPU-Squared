@@ -13,7 +13,7 @@ void InitializeShadowPipeline(ES::Engine::Core &core)
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize pipeline.");
 
 	wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
-	std::string wgslSource = loadFile("shaderShadow.wgsl");
+	std::string wgslSource = loadFile("./assets/shader/shaderShadow.wgsl");
 	wgslDesc.code = wgpu::StringView(wgslSource);
 
 	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
@@ -49,11 +49,8 @@ void InitializeShadowPipeline(ES::Engine::Core &core)
 	wgpu::VertexBufferLayout vertexBufferLayoutTransformsIndex(wgpu::Default);
     vertexBufferLayoutTransformsIndex.attributeCount = static_cast<uint32_t>(vertexAttribsTransformsIndex.size());
     vertexBufferLayoutTransformsIndex.attributes = vertexAttribsTransformsIndex.data();
-    vertexBufferLayoutTransformsIndex.arrayStride = (8 * sizeof(float));
+    vertexBufferLayoutTransformsIndex.arrayStride = sizeof(uint32_t);
     vertexBufferLayoutTransformsIndex.stepMode = wgpu::VertexStepMode::Vertex;
-
-
-
 
     WGPUBindGroupLayoutEntry transformsBindingLayout = {0};
     transformsBindingLayout.binding = 0;
@@ -68,9 +65,6 @@ void InitializeShadowPipeline(ES::Engine::Core &core)
     transformBindGroupLayoutDesc.entries = transformsBindings.data();
     transformBindGroupLayoutDesc.label = wgpu::StringView("Uniforms Bind Group Layout");
     wgpu::BindGroupLayout transformsBindGroupLayout = device.createBindGroupLayout(transformBindGroupLayoutDesc);
-
-
-
 
 	WGPUBindGroupLayoutEntry shadowDataBindingLayoutUniforms = {0};
     shadowDataBindingLayoutUniforms.binding = 0;

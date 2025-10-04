@@ -10,7 +10,7 @@ void InitializeEndPostProcessPipeline(ES::Engine::Core &core)
 	wgpu::TextureFormat surfaceFormat = core.GetResource<wgpu::SurfaceCapabilities>().formats[0];
 
 	wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
-	std::string wgslSource = loadFile("shaderEndPostProcess.wgsl");
+	std::string wgslSource = loadFile("./assets/shader/shaderEndPostProcess.wgsl");
 	wgslDesc.code = wgpu::StringView(wgslSource);
 
 	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);

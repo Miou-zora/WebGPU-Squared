@@ -11,7 +11,7 @@ void InitializeDeferredPipeline(ES::Engine::Core &core)
 	if (device == nullptr) throw std::runtime_error("WebGPU device is not created, cannot initialize pipeline.");
 
 	wgpu::ShaderSourceWGSL wgslDesc(wgpu::Default);
-	std::string wgslSource = loadFile("shaderDeferred.wgsl");
+	std::string wgslSource = loadFile("./assets/shader/shaderDeferred.wgsl");
 	wgslDesc.code = wgpu::StringView(wgslSource);
 
 	wgpu::ShaderModuleDescriptor shaderDesc(wgpu::Default);
