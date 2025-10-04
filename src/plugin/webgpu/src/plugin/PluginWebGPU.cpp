@@ -304,7 +304,6 @@ void Plugin::Bind() {
                       //   lastDumpTime = now;
                       // }
 
-                      entityIndex = 0;
                     }});
         core.GetResource<RenderGraph>().AddRenderPass(RenderPassData{
             .name = "GBuffer",
