@@ -146,7 +146,7 @@ void Plugin::Bind() {
                      .pipelineType = PipelineType::_3D,
                      .loadOp = wgpu::LoadOp::Clear,
                      .clearColor = [](ES::Engine::Core &core) -> glm::vec4 {
-                       return glm::vec4(0);
+                       return glm::vec4(0.0f);
                      },
                      .outputColorTextureName = {},
                      .outputDepthTextureName = "shadows",
