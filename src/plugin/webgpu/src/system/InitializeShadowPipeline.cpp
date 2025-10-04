@@ -49,7 +49,7 @@ void InitializeShadowPipeline(ES::Engine::Core &core)
 	wgpu::VertexBufferLayout vertexBufferLayoutTransformsIndex(wgpu::Default);
     vertexBufferLayoutTransformsIndex.attributeCount = static_cast<uint32_t>(vertexAttribsTransformsIndex.size());
     vertexBufferLayoutTransformsIndex.attributes = vertexAttribsTransformsIndex.data();
-    vertexBufferLayoutTransformsIndex.arrayStride = (1 * sizeof(uint32_t));
+    vertexBufferLayoutTransformsIndex.arrayStride = sizeof(uint32_t);
     vertexBufferLayoutTransformsIndex.stepMode = wgpu::VertexStepMode::Vertex;
 
     WGPUBindGroupLayoutEntry transformsBindingLayout = {0};
