@@ -9,23 +9,21 @@
 namespace ES::Plugin::ImGUI::WebGPU::Util {
 
 void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
-    // Start the Dear ImGui frame
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
 	auto &clearColor = core.GetResource<ClearColor>();
 
-	// Build our UI
 	static float f = 0.0f;
 	static int counter = 0;
 	static bool show_demo_window = true;
 	static bool show_another_window = false;
 
-	ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!"
+	ImGui::Begin("Hello, world!");
 
 	glm::vec3 color = glm::vec3(clearColor.value.r, clearColor.value.g, clearColor.value.b);
-	ImGui::ColorEdit3("clear color", (float*)&color); // Edit 3 floats representing a color
+	ImGui::ColorEdit3("clear color", (float*)&color);
 	clearColor.value = { color.r, color.g, color.b, clearColor.value.a };
 
 	ImGuiIO& io = ImGui::GetIO();
@@ -34,8 +32,6 @@ void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	core.GetRegistry().view<ES::Plugin::WebGPU::Component::Mesh, Name>().each([&](ES::Plugin::WebGPU::Component::Mesh &mesh, Name &name) {
 		ImGui::Checkbox(name.value.c_str(), &mesh.enabled);
 	});
-
-
 
 	auto &lights = core.GetResource<std::vector<Light>>();
 
@@ -85,8 +81,6 @@ void RenderGUI(wgpu::RenderPassEncoder renderPass, ES::Engine::Core &core) {
 	}
 
 	ImGui::End();
-
-    // Draw the UI
     ImGui::EndFrame();
     ImGui::Render();
     ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);

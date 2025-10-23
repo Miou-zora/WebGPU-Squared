@@ -214,7 +214,6 @@ namespace ES::Plugin::Rmlui::WebGPU::System
     {
         auto device = _core.GetResource<wgpu::Device>();
         
-        // Create a 1x1 white texture
         wgpu::TextureDescriptor textureDesc(wgpu::Default);
         textureDesc.size = {1, 1, 1};
         textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
@@ -223,7 +222,6 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         
         _defaultTexture = device.createTexture(textureDesc);
         
-        // Create texture view
         wgpu::TextureViewDescriptor viewDesc(wgpu::Default);
         viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
         viewDesc.dimension = wgpu::TextureViewDimension::_2D;
@@ -235,7 +233,6 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         
         _defaultTextureView = _defaultTexture.createView(viewDesc);
         
-        // Create sampler
         wgpu::SamplerDescriptor samplerDesc(wgpu::Default);
         samplerDesc.magFilter = wgpu::FilterMode::Linear;
         samplerDesc.minFilter = wgpu::FilterMode::Linear;
@@ -248,7 +245,6 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         
         _defaultSampler = device.createSampler(samplerDesc);
         
-        // Create bind group for default texture
         wgpu::BindGroupEntry textureBinding(wgpu::Default);
         textureBinding.binding = 0;
         textureBinding.textureView = _defaultTextureView;
@@ -267,7 +263,6 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         
         _defaultTextureBindGroup = device.createBindGroup(bindGroupDesc);
         
-        // Upload white pixel data
         uint8_t whitePixel[4] = {255, 255, 255, 255};
         auto queue = _core.GetResource<wgpu::Queue>();
         
@@ -438,7 +433,7 @@ Rml::CompiledGeometryHandle WGPURenderInterface::CompileGeometry(Rml::Span<const
         samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
-        samplerDesc.maxAnisotropy = 1; // Fix: Set to 1 instead of default 0
+        samplerDesc.maxAnisotropy = 1;
         
         auto sampler = device.createSampler(samplerDesc);
         
@@ -518,7 +513,7 @@ Rml::CompiledGeometryHandle WGPURenderInterface::CompileGeometry(Rml::Span<const
         samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
-        samplerDesc.maxAnisotropy = 1; // Fix: Set to 1 instead of default 0
+        samplerDesc.maxAnisotropy = 1;
         
         auto sampler = device.createSampler(samplerDesc);
         

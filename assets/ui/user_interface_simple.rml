@@ -1,0 +1,86 @@
+<rml>
+<head>
+    <title>WebGPU RmlUI Test Interface</title>
+    <link type="text/rcss" href="user_interface_simple.rcss" />
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="header">
+        <h1 class="title">WebGPU RmlUI Test Interface</h1>
+        <p class="subtitle">Testing Text Rendering and Texture Display</p>
+    </div>
+
+    <!-- Text Rendering Tests -->
+    <div class="text-section">
+        <h2 class="section-title">Text Rendering Tests</h2>
+        
+        <div class="text-group">
+            <h3>Font Styles</h3>
+            <p class="normal-text">Normal text with default styling</p>
+            <p class="bold-text">Bold text for emphasis</p>
+            <p class="large-text">Large text for headers</p>
+            <p class="small-text">Small text for details</p>
+        </div>
+
+        <div class="text-group">
+            <h3>Color Variations</h3>
+            <p class="red-text">Red text for warnings</p>
+            <p class="green-text">Green text for success</p>
+            <p class="blue-text">Blue text for information</p>
+            <p class="yellow-text">Yellow text for highlights</p>
+        </div>
+    </div>
+
+    <!-- Texture/Image Tests -->
+    <div class="texture-section">
+        <h2 class="section-title">Texture & Image Tests</h2>
+        
+        <div class="image-group">
+            <h3>Single Image Test</h3>
+            <div class="image-container">
+                <img src="../texture/insect.png" class="test-image" alt="Insect Texture" />
+                <p class="image-label">Insect Texture</p>
+            </div>
+        </div>
+
+        <div class="image-group">
+            <h3>Scaled Images</h3>
+            <div class="scaled-images">
+                <div class="image-container">
+                    <img src="../texture/insect.png" class="small-image" alt="Small Insect" />
+                    <p class="image-label">Small (64x64)</p>
+                </div>
+                <div class="image-container">
+                    <img src="../texture/insect.png" class="medium-image" alt="Medium Insect" />
+                    <p class="image-label">Medium (128x128)</p>
+                </div>
+                <div class="image-container">
+                    <img src="../texture/insect.png" class="large-image" alt="Large Insect" />
+                    <p class="image-label">Large (256x256)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Elements -->
+    <div class="interactive-section">
+        <h2 class="section-title">Interactive Elements</h2>
+        
+        <div class="button-group">
+            <button class="test-button primary">Primary Button</button>
+            <button class="test-button secondary">Secondary Button</button>
+            <button class="test-button danger">Danger Button</button>
+        </div>
+
+        <div class="input-group">
+            <label for="test-input">Text Input:</label>
+            <input type="text" id="test-input" class="test-input" placeholder="Enter some text..." />
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p class="footer-text">WebGPU RmlUI Test - All elements should render correctly</p>
+    </div>
+</body>
+</rml>

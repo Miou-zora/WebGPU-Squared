@@ -16,7 +16,7 @@ namespace ES::Plugin::Rmlui::WebGPU
             System::InitializeRmlUI,
             System::InitializeRmlUIRenderPass
         );
-        
+
         // RmlUI rendering is handled by the render pass system in ToGPU phase
         // No need for additional Draw phase systems
     }

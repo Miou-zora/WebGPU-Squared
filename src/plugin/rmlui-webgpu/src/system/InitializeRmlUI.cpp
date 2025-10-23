@@ -28,7 +28,6 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         }
         ES::Utils::Log::Debug("RmlUI: Context created");
         
-        // Verify the render interface is set on the context
         auto* contextRenderInterface = Rml::GetRenderInterface();
         ES::Utils::Log::Debug("Context render interface: " + std::to_string(reinterpret_cast<uintptr_t>(contextRenderInterface)));
         ES::Utils::Log::Debug("Custom render interface: " + std::to_string(reinterpret_cast<uintptr_t>(renderInterface)));
@@ -40,9 +39,9 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         }
         ES::Utils::Log::Debug("RmlUI: Font loaded");
         
-        ES::Utils::Log::Debug("RmlUI: Loading UI document: assets/ui/user_interface.rml");
+        ES::Utils::Log::Debug("RmlUI: Loading UI document: assets/ui/user_interface_simple.rml");
         
-        Rml::ElementDocument* document = context->LoadDocument("assets/ui/user_interface.rml");
+        Rml::ElementDocument* document = context->LoadDocument("assets/ui/user_interface_simple.rml");
         if (document) {
             ES::Utils::Log::Debug("RmlUI: UI document loaded");
             document->Show();
