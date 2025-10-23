@@ -8,6 +8,7 @@
 #include "RenderingPipeline.hpp"
 #include "Input.hpp"
 #include "Scene.hpp"
+#include "RmluiWebgpu.hpp"
 
 float cameraScale = 1.0f;
 float cameraSpeed = 3.0f;
@@ -387,7 +388,9 @@ auto main(int ac, char **av) -> int
 			entity.AddComponent<ES::Plugin::Object::Component::Transform>(core, glm::vec3(0.0f, 0.0f, 0.0f));
 			entity.AddComponent<Name>(core, "Sprite Example 2");
 		});
-
+	core.RegisterSystem<ES::Engine::Scheduler::Shutdown>(
+		ES::Plugin::Rmlui::WebGPU::System::CleanupRmlUI
+	);
 	core.RunCore();
 
 	return 0;

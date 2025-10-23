@@ -1,5 +1,24 @@
 #pragma once
 
-#include "plugin/PluginRmluiWebgpu.hpp"
-#include "utils/WGPURenderInterface.hpp"
-#include "utils/IRenderer.hpp"
+// --- Plugin ---
+#include "PluginRmluiWebgpu.hpp"
+
+// --- Resource
+#include "AUIContext.hpp"
+#include "UIContext.hpp"
+
+// --- Utils ---
+#include "EventListener.hpp"
+#include "IRenderer.hpp"
+#include "WGPURenderInterface.hpp"
+#include "WGPUSystemInterface.hpp"
+
+// --- System ---
+// Setup
+#include "InitializeRmlUI.hpp"
+#include "InitializeRmlUIRenderPass.hpp"
+#include "InitUI.hpp"
+
+// Draw
+#include "RenderRmlUI.hpp"
+#include "UpdateUI.hpp"

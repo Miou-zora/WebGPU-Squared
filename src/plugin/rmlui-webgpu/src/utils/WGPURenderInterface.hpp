@@ -61,6 +61,9 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         
         void SetRenderPassEncoder(wgpu::RenderPassEncoder renderPass);
         void RenderQueuedGeometry();
+        
+        // Debug methods
+        size_t GetRenderQueueSize() const { return _renderQueue.size(); }
 
     private:
         ES::Engine::Core &_core;
@@ -81,11 +84,18 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         wgpu::Buffer _uniformBuffer = nullptr;
         wgpu::BindGroup _uniformBindGroup = nullptr;
         
+        // Default white texture for elements without textures
+        wgpu::Texture _defaultTexture = nullptr;
+        wgpu::TextureView _defaultTextureView = nullptr;
+        wgpu::Sampler _defaultSampler = nullptr;
+        wgpu::BindGroup _defaultTextureBindGroup = nullptr;
+        
         std::vector<QueuedGeometry> _renderQueue;
         wgpu::RenderPassEncoder _currentRenderPass = nullptr;
         
         void InitializePipeline();
         void CreateUniformBuffer();
+        void CreateDefaultTexture();
         RmlUIVertex ConvertVertex(const Rml::Vertex& rmlVertex);
         wgpu::Buffer CreateVertexBuffer(const std::vector<RmlUIVertex>& vertices);
         wgpu::Buffer CreateIndexBuffer(const std::vector<uint32_t>& indices);

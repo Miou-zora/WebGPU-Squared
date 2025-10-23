@@ -12,6 +12,7 @@ namespace ES::Plugin::Rmlui::WebGPU::System
     {
         InitializePipeline();
         CreateUniformBuffer();
+        CreateDefaultTexture();
     }
 
     void WGPURenderInterface::InitializePipeline()
@@ -209,6 +210,80 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         bindGroups.groups["RmlUIUniforms"] = _uniformBindGroup;
     }
 
+    void WGPURenderInterface::CreateDefaultTexture()
+    {
+        auto device = _core.GetResource<wgpu::Device>();
+        
+        // Create a 1x1 white texture
+        wgpu::TextureDescriptor textureDesc(wgpu::Default);
+        textureDesc.size = {1, 1, 1};
+        textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        textureDesc.label = wgpu::StringView("RmlUI Default Texture");
+        
+        _defaultTexture = device.createTexture(textureDesc);
+        
+        // Create texture view
+        wgpu::TextureViewDescriptor viewDesc(wgpu::Default);
+        viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        viewDesc.dimension = wgpu::TextureViewDimension::_2D;
+        viewDesc.baseMipLevel = 0;
+        viewDesc.mipLevelCount = 1;
+        viewDesc.baseArrayLayer = 0;
+        viewDesc.arrayLayerCount = 1;
+        viewDesc.label = wgpu::StringView("RmlUI Default Texture View");
+        
+        _defaultTextureView = _defaultTexture.createView(viewDesc);
+        
+        // Create sampler
+        wgpu::SamplerDescriptor samplerDesc(wgpu::Default);
+        samplerDesc.magFilter = wgpu::FilterMode::Linear;
+        samplerDesc.minFilter = wgpu::FilterMode::Linear;
+        samplerDesc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+        samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.maxAnisotropy = 1;
+        samplerDesc.label = wgpu::StringView("RmlUI Default Sampler");
+        
+        _defaultSampler = device.createSampler(samplerDesc);
+        
+        // Create bind group for default texture
+        wgpu::BindGroupEntry textureBinding(wgpu::Default);
+        textureBinding.binding = 0;
+        textureBinding.textureView = _defaultTextureView;
+        
+        wgpu::BindGroupEntry samplerBinding(wgpu::Default);
+        samplerBinding.binding = 1;
+        samplerBinding.sampler = _defaultSampler;
+        
+        std::array<wgpu::BindGroupEntry, 2> textureBindings = { textureBinding, samplerBinding };
+        
+        wgpu::BindGroupDescriptor bindGroupDesc(wgpu::Default);
+        bindGroupDesc.layout = _textureBindGroupLayout;
+        bindGroupDesc.entryCount = textureBindings.size();
+        bindGroupDesc.entries = textureBindings.data();
+        bindGroupDesc.label = wgpu::StringView("RmlUI Default Texture Bind Group");
+        
+        _defaultTextureBindGroup = device.createBindGroup(bindGroupDesc);
+        
+        // Upload white pixel data
+        uint8_t whitePixel[4] = {255, 255, 255, 255};
+        auto queue = _core.GetResource<wgpu::Queue>();
+        
+        wgpu::TexelCopyTextureInfo destination(wgpu::Default);
+        destination.texture = _defaultTexture;
+        destination.mipLevel = 0;
+        destination.origin = {0, 0, 0};
+        
+        wgpu::TexelCopyBufferLayout sourceLayout(wgpu::Default);
+        sourceLayout.offset = 0;
+        sourceLayout.bytesPerRow = 4;
+        sourceLayout.rowsPerImage = 1;
+        
+        queue.writeTexture(destination, whitePixel, 4, sourceLayout, {1, 1, 1});
+    }
+
     RmlUIVertex WGPURenderInterface::ConvertVertex(const Rml::Vertex& rmlVertex)
     {
         RmlUIVertex vertex;
@@ -261,9 +336,9 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         return (it != _textures.end()) ? it->second.get() : nullptr;
     }
 
-    Rml::CompiledGeometryHandle WGPURenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices)
-    {
-        auto handle = _nextGeometryHandle++;
+Rml::CompiledGeometryHandle WGPURenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices)
+{
+    auto handle = _nextGeometryHandle++;
         
         std::vector<RmlUIVertex> rmlVertices;
         rmlVertices.reserve(vertices.size());
@@ -363,6 +438,7 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.maxAnisotropy = 1; // Fix: Set to 1 instead of default 0
         
         auto sampler = device.createSampler(samplerDesc);
         
@@ -442,6 +518,7 @@ namespace ES::Plugin::Rmlui::WebGPU::System
         samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
         samplerDesc.addressModeW = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.maxAnisotropy = 1; // Fix: Set to 1 instead of default 0
         
         auto sampler = device.createSampler(samplerDesc);
         
@@ -571,11 +648,16 @@ namespace ES::Plugin::Rmlui::WebGPU::System
             _currentRenderPass.setVertexBuffer(0, geometry->vertexBuffer, 0, geometry->vertexCount * sizeof(RmlUIVertex));
             _currentRenderPass.setIndexBuffer(geometry->indexBuffer, wgpu::IndexFormat::Uint32, 0, geometry->indexCount * sizeof(uint32_t));
             
+            // Set texture bind group (either specific texture or default white texture)
             if (queued.textureHandle != 0) {
                 auto* texture = GetTexture(queued.textureHandle);
                 if (texture) {
                     _currentRenderPass.setBindGroup(1, texture->bindGroup, 0, nullptr);
+                } else {
+                    _currentRenderPass.setBindGroup(1, _defaultTextureBindGroup, 0, nullptr);
                 }
+            } else {
+                _currentRenderPass.setBindGroup(1, _defaultTextureBindGroup, 0, nullptr);
             }
             
             if (_scissorEnabled) {

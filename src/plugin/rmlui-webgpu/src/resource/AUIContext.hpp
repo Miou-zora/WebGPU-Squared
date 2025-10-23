@@ -2,6 +2,7 @@
 
 #include "Engine.hpp"
 #include "utils/IRenderer.hpp"
+#include "utils/EventListener.hpp"
 
 template <typename T>
 concept CSystemInterface = std::is_base_of_v<Rml::SystemInterface, T>;
@@ -58,7 +59,7 @@ namespace ES::Plugin::Rmlui
         virtual const std::string &GetTitle() const = 0;
         virtual void UpdateInnerContent(const std::string &childId, const std::string &content) = 0;
         virtual void SetTransformProperty(const std::string &childId, const std::vector<TransformParam> &transforms) = 0;
-        virtual void AttachEventHandlers(const std::string &elementId, const std::string &eventType, ES::Plugin::UI::Utils::EventListener::EventCallback callback) = 0;
+        virtual void AttachEventHandlers(const std::string &elementId, const std::string &eventType, ES::Plugin::Rmlui::Utils::EventListener::EventCallback callback) = 0;
         virtual void DetachEventHandler(const std::string &elementId, const std::string &eventType) = 0;
         virtual std::string GetValue(const std::string &elementId) const = 0;
         virtual std::string GetStyle(const std::string &elementId, const std::string &property) const = 0;

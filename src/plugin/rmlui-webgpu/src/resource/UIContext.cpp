@@ -55,7 +55,7 @@ namespace ES::Plugin::Rmlui::Resource
         auto &listener = _events[key];
         if (!listener)
         {
-            listener = std::make_unique<ES::Plugin::UI::Utils::EventListener>(*_context);
+            listener = std::make_unique<ES::Plugin::Rmlui::Utils::EventListener>(*_context);
             listener->SetCallback(core);
         }
     }
@@ -181,7 +181,7 @@ namespace ES::Plugin::Rmlui::Resource
             ES::Utils::Log::Warn(fmt::format("RmlUi: Could not apply property to node id '{}': Not found", childId));
     }
 
-    void UIContext::AttachEventHandlers(const std::string &elementId, const std::string &eventType, ES::Plugin::UI::Utils::EventListener::EventCallback callback)
+    void UIContext::AttachEventHandlers(const std::string &elementId, const std::string &eventType, ES::Plugin::Rmlui::Utils::EventListener::EventCallback callback)
     {
         if (!_isReady())
         {
@@ -202,7 +202,7 @@ namespace ES::Plugin::Rmlui::Resource
         const std::string key = elementId + "::" + eventType;
         auto &listener = _events[key];
         if (!listener)
-            listener = std::make_unique<ES::Plugin::UI::Utils::EventListener>(*_context);
+            listener = std::make_unique<ES::Plugin::Rmlui::Utils::EventListener>(*_context);
         listener->SetEventCallback(callback);
         listener->AttachEvents(eventType, *element);
     }
