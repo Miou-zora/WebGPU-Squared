@@ -1,3 +1,5 @@
+add_requires("rmlui >=6.0")
+
 includes("../webgpu/xmake.lua")
 
 target("PluginRmluiWebgpu")
@@ -9,6 +11,7 @@ target("PluginRmluiWebgpu")
     add_deps("PluginWebGPU")
     add_packages("glfw", "glew", "stb", "wgpu-native", "glfw3webgpu", "lodepng")
     add_packages("enginesquared")
+    add_packages("rmlui")
 
     add_files("src/**.cpp")
 

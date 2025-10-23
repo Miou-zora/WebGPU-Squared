@@ -1,7 +1,7 @@
 
 #include "ConfigureSurface.hpp"
 #include "WebGPU.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 
 void ES::Plugin::WebGPU::System::UpdateCameraBuffer(ES::Engine::Core &core) {
 	wgpu::Queue queue = core.GetResource<wgpu::Queue>();

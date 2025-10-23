@@ -6,6 +6,7 @@ add_requires("glfw3webgpu v1.3.0-alpha", {configs = {shared = false}, debug = tr
 add_requires("imgui v1.92.0-docking", {configs = {shared = false, glfw = true, wgpu = true, wgpu_backend = "wgpu"}, debug = true})
 add_requires("stb")
 add_requires("lodepng")
+add_requires("rmlui >=6.0")
 
 add_repositories("package_repo https://github.com/EngineSquared/xrepo.git")
 
@@ -30,6 +31,7 @@ target(project_name)
     add_packages("imgui")
     add_packages("glfw3webgpu")
     add_packages("lodepng")
+    add_packages("rmlui")
 
     -- add_deps("EngineSquared")
     add_packages("enginesquared")
@@ -48,6 +50,15 @@ target(project_name)
     add_includedirs("src/", {public = true})
 
     set_rundir("$(projectdir)")
+
+    after_build(function (target)
+        local assets_src = path.join(os.projectdir(), "assets")
+        local assets_dst = path.join(target:targetdir(), "assets")
+        
+        if os.isdir(assets_src) then
+            os.cp(assets_src, assets_dst)
+        end
+    end)
 
     -- add_cxxflags("-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Wnon-virtual-dtor", "-Wold-style-cast", "-Wcast-align", "-Wunused", "-Woverloaded-virtual", "-Wconversion", "-Wsign-conversion", "-Wmisleading-indentation", "-Wnull-dereference", "-Wlong-long", "-Wdouble-promotion", "-Wformat=2", "-Wno-unused-parameter", {force = true})
     -- if is_plat("macosx") then

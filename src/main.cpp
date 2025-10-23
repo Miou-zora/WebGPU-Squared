@@ -1,5 +1,5 @@
 // TODO: find a better way to not create dependencies to ImGui when not used
-// #define USE_IMGUI
+//#define USE_IMGUI
 #if defined(USE_IMGUI)
 #include "ImGUI.hpp"
 #endif
@@ -271,7 +271,7 @@ auto main(int ac, char **av) -> int
 #if defined(USE_IMGUI)
 		ES::Plugin::ImGUI::WebGPU::Plugin,
 #endif
-		ES::Plugin::Rmlui::Plugin,
+		ES::Plugin::Rmlui::WebGPU::Plugin,
 		CameraPlugin>();
 
 	core.RegisterSystem<ES::Engine::Scheduler::Startup>(

@@ -1,7 +1,7 @@
 
 #include "ConfigureSurface.hpp"
 #include "WebGPU.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 #include "component/Transform.hpp"
 
 void ES::Plugin::WebGPU::System::UpdateBufferUniforms(ES::Engine::Core &core) {

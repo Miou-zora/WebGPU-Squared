@@ -1,5 +1,5 @@
 #include "WebGPU.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 #include "ConfigureSurface.hpp"
 #include "InitDepthBuffer.hpp"
 #include "UnconfigureSurface.hpp"

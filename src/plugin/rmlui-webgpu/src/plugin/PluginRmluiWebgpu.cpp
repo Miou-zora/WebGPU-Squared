@@ -1,16 +1,24 @@
-#include "RmluiWebgpu.hpp"
+#include "PluginRmluiWebgpu.hpp"
+#include "system/InitializeRmlUI.hpp"
+#include "system/InitializeRmlUIRenderPass.hpp"
+#include "system/RenderRmlUI.hpp"
+#include "../../webgpu/src/WebGPU.hpp"
 #include "RenderingPipeline.hpp"
 
-namespace ES::Plugin::Rmlui {
-    void Plugin::Bind() {
+namespace ES::Plugin::Rmlui::WebGPU
+{
+    void Plugin::Bind()
+    {
         RequirePlugins<ES::Plugin::RenderingPipeline::Plugin>();
-
-        RegisterResource(Resource::UIContext());
-
-        RegisterSystems<ES::Plugin::RenderingPipeline::RenderSetup>(ES::Plugin::Rmlui::System::UpdateMouseMoveEvent,
-                                                                    ES::Plugin::Rmlui::System::Update);
-        RegisterSystems<ES::Plugin::RenderingPipeline::ToGPU>(ES::Plugin::Rmlui::System::Render);
-        RegisterSystems<ES::Plugin::RenderingPipeline::Init>(ES::Plugin::Rmlui::WebGPU::System::Init);
-        RegisterSystems<ES::Engine::Scheduler::Shutdown>(ES::Plugin::Rmlui::WebGPU::System::Destroy);
+        RequirePlugins<ES::Plugin::WebGPU::Plugin>();
+        
+        RegisterSystems<ES::Plugin::RenderingPipeline::Setup>(
+            System::InitializeRmlUI,
+            System::InitializeRmlUIRenderPass
+        );
+        
+        RegisterSystems<ES::Plugin::RenderingPipeline::Draw>(
+            System::RenderRmlUI
+        );
     }
 }

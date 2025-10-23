@@ -1,0 +1,146 @@
+<rml>
+	<head>
+		<title>WebGPU RmlUI Test Interface</title>
+		<link type="text/rcss" href="user_interface.rcss" />
+	</head>
+	<body>
+		<!-- Header Section -->
+		<div class="header">
+			<h1 class="title">WebGPU RmlUI Test Interface</h1>
+			<p class="subtitle">Testing Text Rendering and Texture Display</p>
+		</div>
+
+		<!-- Text Rendering Tests -->
+		<div class="text-section">
+			<h2 class="section-title">Text Rendering Tests</h2>
+			
+			<div class="text-group">
+				<h3>Font Styles</h3>
+				<p class="normal-text">Normal text with default styling</p>
+				<p class="bold-text">Bold text for emphasis</p>
+				<p class="italic-text">Italic text for style</p>
+				<p class="large-text">Large text for headers</p>
+				<p class="small-text">Small text for details</p>
+			</div>
+
+			<div class="text-group">
+				<h3>Color Variations</h3>
+				<p class="red-text">Red text for warnings</p>
+				<p class="green-text">Green text for success</p>
+				<p class="blue-text">Blue text for information</p>
+				<p class="yellow-text">Yellow text for highlights</p>
+				<p class="purple-text">Purple text for special content</p>
+			</div>
+
+			<div class="text-group">
+				<h3>Text Alignment</h3>
+				<p class="left-align">Left aligned text</p>
+				<p class="center-align">Center aligned text</p>
+				<p class="right-align">Right aligned text</p>
+			</div>
+
+			<div class="text-group">
+				<h3>Special Characters & Numbers</h3>
+				<p class="special-chars">Special chars: !@#$%^&amp;*()_+-=[]{}|;':\",./&lt;&gt;?</p>
+				<p class="numbers">Numbers: 0123456789</p>
+				<p class="unicode">Unicode: αβγδε 中文 العربية 🚀🎮</p>
+			</div>
+		</div>
+
+		<!-- Texture/Image Tests -->
+		<div class="texture-section">
+			<h2 class="section-title">Texture & Image Tests</h2>
+			
+			<div class="image-group">
+				<h3>Single Image Tests</h3>
+				<div class="image-container">
+					<img src="../texture/insect.png" class="test-image" alt="Insect Texture" />
+					<p class="image-label">Insect Texture (Original Size)</p>
+				</div>
+			</div>
+
+			<div class="image-group">
+				<h3>Scaled Images</h3>
+				<div class="scaled-images">
+					<div class="image-container">
+						<img src="../texture/insect.png" class="small-image" alt="Small Insect" />
+						<p class="image-label">Small (64x64)</p>
+					</div>
+					<div class="image-container">
+						<img src="../texture/insect.png" class="medium-image" alt="Medium Insect" />
+						<p class="image-label">Medium (128x128)</p>
+					</div>
+					<div class="image-container">
+						<img src="../texture/insect.png" class="large-image" alt="Large Insect" />
+						<p class="image-label">Large (256x256)</p>
+					</div>
+				</div>
+			</div>
+
+			<div class="image-group">
+				<h3>Image with Text Overlay</h3>
+				<div class="overlay-container">
+					<img src="../texture/insect.png" class="overlay-image" alt="Overlay Test" />
+					<div class="overlay-text">Text Over Image</div>
+				</div>
+			</div>
+
+			<div class="image-group">
+				<h3>Repeated Images (Pattern Test)</h3>
+				<div class="pattern-container">
+					<div class="pattern-item">
+						<img src="../texture/insect.png" class="pattern-image" alt="Pattern 1" />
+					</div>
+					<div class="pattern-item">
+						<img src="../texture/insect.png" class="pattern-image" alt="Pattern 2" />
+					</div>
+					<div class="pattern-item">
+						<img src="../texture/insect.png" class="pattern-image" alt="Pattern 3" />
+					</div>
+					<div class="pattern-item">
+						<img src="../texture/insect.png" class="pattern-image" alt="Pattern 4" />
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Interactive Elements -->
+		<div class="interactive-section">
+			<h2 class="section-title">Interactive Elements</h2>
+			
+			<div class="button-group">
+				<button class="test-button primary">Primary Button</button>
+				<button class="test-button secondary">Secondary Button</button>
+				<button class="test-button danger">Danger Button</button>
+			</div>
+
+			<div class="input-group">
+				<label for="test-input">Text Input:</label>
+				<input type="text" id="test-input" class="test-input" placeholder="Enter some text..." />
+			</div>
+		</div>
+
+		<!-- Performance Test -->
+		<div class="performance-section">
+			<h2 class="section-title">Performance Test</h2>
+			<div class="performance-grid">
+				<!-- This will test rendering many small elements -->
+				<div class="performance-item" style="top: 0px; left: 0px;">1</div>
+				<div class="performance-item" style="top: 0px; left: 20px;">2</div>
+				<div class="performance-item" style="top: 0px; left: 40px;">3</div>
+				<div class="performance-item" style="top: 0px; left: 60px;">4</div>
+				<div class="performance-item" style="top: 0px; left: 80px;">5</div>
+				<div class="performance-item" style="top: 20px; left: 0px;">6</div>
+				<div class="performance-item" style="top: 20px; left: 20px;">7</div>
+				<div class="performance-item" style="top: 20px; left: 40px;">8</div>
+				<div class="performance-item" style="top: 20px; left: 60px;">9</div>
+				<div class="performance-item" style="top: 20px; left: 80px;">10</div>
+			</div>
+		</div>
+
+		<!-- Footer -->
+		<div class="footer">
+			<p class="footer-text">WebGPU RmlUI Test - All elements should render correctly</p>
+		</div>
+	</body>
+</rml>

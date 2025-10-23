@@ -1,6 +1,6 @@
 #include "InitDepthBuffer.hpp"
 #include "WebGPU.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 #include "structs.hpp"
 
 namespace ES::Plugin::WebGPU::System {

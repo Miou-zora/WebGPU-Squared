@@ -1,6 +1,6 @@
 #include "InitGBufferTextures.hpp"
 #include "structs.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 #include "plugin/PluginWindow.hpp"
 #include <GLFW/glfw3.h>
 

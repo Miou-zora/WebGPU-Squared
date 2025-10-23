@@ -1,7 +1,7 @@
 #include "WebGPU.hpp"
 #include "UpdateBuffers.hpp"
 #include "structs.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
