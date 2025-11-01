@@ -8,6 +8,7 @@
 
 // --- Resource
 #include "RenderGraph.hpp"
+#include "resource/SamplerContainer.hpp"
 
 // --- Util ---
 #include "CreateSprite.hpp"
@@ -27,6 +28,8 @@
 #include "RequestCapabilities.hpp"
 #include "CreateDevice.hpp"
 #include "CreateQueue.hpp"
+#include "InitSamplerContainer.hpp"
+#include "ReleaseSamplerContainer.hpp"
 #include "SetupQueueOnSubmittedWorkDone.hpp"
 #include "ConfigureSurface.hpp"
 #include "ReleaseAdapter.hpp"

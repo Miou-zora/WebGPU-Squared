@@ -5,7 +5,7 @@
 #include "PluginImGUI.hpp"
 #include "WebGPU.hpp"
 #include "RenderingPipeline.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 #include "RenderGUI.hpp"
 #include "PipelineType.hpp"
 

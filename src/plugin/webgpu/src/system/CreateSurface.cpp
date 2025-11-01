@@ -1,6 +1,6 @@
 #include "CreateSurface.hpp"
 #include "WebGPU.hpp"
-#include "resource/window/Window.hpp"
+#include "resource/Window/Window.hpp"
 #include <glfw3webgpu.h>
 
 namespace ES::Plugin::WebGPU::System {

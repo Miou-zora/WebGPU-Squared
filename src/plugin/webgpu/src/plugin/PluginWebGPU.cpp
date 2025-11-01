@@ -118,6 +118,7 @@ void Plugin::Bind() {
 #endif
       System::ReleaseInstance, System::RequestCapabilities,
       System::CreateDevice, System::CreateQueue,
+      System::InitSamplerContainer,
       System::SetupQueueOnSubmittedWorkDone, System::ConfigureSurface,
       System::ReleaseAdapter,
 #if defined(ES_DEBUG)
@@ -464,6 +465,6 @@ void Plugin::Bind() {
       System::ReleaseBindingGroup, System::ReleaseUniforms,
       System::ReleaseBuffers, System::TerminateDepthBuffer,
       System::ReleasePipeline, System::ReleaseDevice, System::ReleaseSurface,
-      System::ReleaseQueue);
+      System::ReleaseQueue, System::ReleaseSamplerContainer);
 }
 } // namespace ES::Plugin::WebGPU
